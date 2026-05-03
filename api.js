@@ -1,11 +1,6 @@
 /**
  * Astro Exchange — Public API
  * Run alongside the bot: node api.js
- * The bot writes to JSON files; this server reads them and exposes safe,
- * anonymised data to the website.
- *
- * Start: node api.js
- * Default port: 3000  (set PORT env var to override)
  */
 
 const express = require("express");
@@ -17,7 +12,6 @@ const https   = require("https");
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// ── CORS: allow your GitHub Pages domain (and localhost for dev) ──
 const ALLOWED_ORIGINS = [
   "https://timmyfrancesco-gif.github.io",
   "http://localhost",
@@ -33,7 +27,6 @@ app.use(cors({
 
 app.use(express.json());
 
-// ── DATA DIR (same as bot) ──
 const DATA_DIR = process.env.DATA_DIR || "./";
 
 function load(file) {
@@ -42,43 +35,126 @@ function load(file) {
   try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return {}; }
 }
 
-// ── HELPERS ──
-function maskEmail(email = "") {
-  const at = email.indexOf("@");
-  if (at > 2) return email[0] + "****" + email[at - 1] + email.slice(at);
-  if (at > 0) return email[0] + "****" + email.slice(at);
-  return "****";
+// ─────────────────────────────────────────────
+//  DISCORD REST helper
+// ─────────────────────────────────────────────
+function discordRequest(method, urlPath, body) {
+  const token = process.env.DISCORD_BOT_TOKEN || process.env.TOKEN || process.env.BOT_TOKEN;
+  if (!token) return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    const bodyStr = body ? JSON.stringify(body) : "";
+    const req = https.request({
+      hostname: "discord.com",
+      path: `/api/v10${urlPath}`,
+      method,
+      headers: {
+        "Authorization": `Bot ${token}`,
+        "Content-Type": "application/json",
+        ...(bodyStr && { "Content-Length": Buffer.byteLength(bodyStr) }),
+      },
+    }, (res) => {
+      let d = "";
+      res.on("data", c => d += c);
+      res.on("end", () => { try { resolve(JSON.parse(d)); } catch { resolve(null); } });
+    });
+    req.on("error", () => resolve(null));
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
 }
 
-function timeAgo(ts) {
-  const diff = Date.now() - ts;
-  const m = Math.floor(diff / 60000);
-  const h = Math.floor(diff / 3600000);
-  const d = Math.floor(diff / 86400000);
-  if (m < 1)  return "just now";
-  if (m < 60) return `${m}m ago`;
-  if (h < 24) return `${h}h ago`;
-  return `${d}d ago`;
+async function notifyDiscordNewOrder(order) {
+  const channelId = process.env.DISCORD_LOG_CHANNEL_ID;
+  if (!channelId) return null;
+
+  const labels = { weekly: "7 giorni", monthly: "30 giorni", lifetime: "Lifetime" };
+
+  const msg = await discordRequest("POST", `/channels/${channelId}/messages`, {
+    embeds: [{
+      title: "🛒 Nuovo ordine slot dal sito",
+      color: 0x5FB3C4,
+      fields: [
+        { name: "📦 Categoria",     value: `**${order.tier}**`,                     inline: true },
+        { name: "⏱ Durata",              value: labels[order.duration] || order.duration, inline: true },
+        { name: "💶 Importo",       value: `€${order.amountEur}`,               inline: true },
+        { name: "👤 Discord",       value: order.discord || "*Non inserito*",        inline: true },
+        { name: "🔑 Indirizzo LTC", value: `\`${order.address}\``,                   inline: false },
+        { name: "🆔 Order ID",      value: `\`${order.orderId}\``,                   inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+      footer: { text: "Astro Exchange · In attesa di pagamento" },
+    }],
+    components: [{
+      type: 1,
+      components: [
+        { type: 2, style: 3, label: "✅ Attiva Slot", custom_id: `activate_slot_${order.orderId}` },
+        { type: 2, style: 4, label: "❌ Annulla",     custom_id: `cancel_slot_${order.orderId}` },
+      ],
+    }],
+  });
+
+  return msg?.id || null;
+}
+
+async function notifyDiscordPaid(order) {
+  const channelId = process.env.DISCORD_LOG_CHANNEL_ID;
+  if (!channelId) return;
+
+  const labels = { weekly: "7 giorni", monthly: "30 giorni", lifetime: "Lifetime" };
+
+  await discordRequest("POST", `/channels/${channelId}/messages`, {
+    embeds: [{
+      title: "✅ Pagamento ricevuto — attiva lo slot!",
+      color: 0x4ade80,
+      fields: [
+        { name: "📦 Categoria", value: `**${order.tier}**`,                     inline: true },
+        { name: "⏱ Durata",          value: labels[order.duration] || order.duration, inline: true },
+        { name: "💶 Importo",   value: `€${order.amountEur}`,               inline: true },
+        { name: "👤 Discord",   value: order.discord || "*Non inserito*",        inline: true },
+        { name: "🆔 Order ID",  value: `\`${order.orderId}\``,                   inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+      footer: { text: "Astro Exchange · Pagamento confermato on-chain" },
+    }],
+    components: [{
+      type: 1,
+      components: [
+        { type: 2, style: 3, label: "✅ Attiva Slot", custom_id: `activate_slot_${order.orderId}` },
+      ],
+    }],
+  });
+
+  if (order.discordMsgId) {
+    await discordRequest("PATCH", `/channels/${channelId}/messages/${order.discordMsgId}`, {
+      components: [{
+        type: 1,
+        components: [
+          { type: 2, style: 3, label: "✅ Pagato",    custom_id: `activate_slot_${order.orderId}`, disabled: true },
+          { type: 2, style: 4, label: "❌ Annulla",   custom_id: `cancel_slot_${order.orderId}`,   disabled: true },
+        ],
+      }],
+    });
+  }
 }
 
 // ─────────────────────────────────────────────
 //  GET /api/stats
 // ─────────────────────────────────────────────
 app.get("/api/stats", (req, res) => {
-  const slots        = load("slots.json");
-  const mmSessions   = load("mm_sessions.json");
-  const escrowCount  = load("escrow_trade_count.json");
-  const userTx       = load("user_transactions.json");
-  const liveStock    = load("livestock.json");
-  const pending      = load("pending_payments.json");
+  const slots       = load("slots.json");
+  const mmSessions  = load("mm_sessions.json");
+  const escrowCount = load("escrow_trade_count.json");
+  const userTx      = load("user_transactions.json");
+  const pending     = load("pending_payments.json");
 
-  const activeSlots      = Object.keys(slots).length;
-  const completedMM      = Object.values(mmSessions).filter(s => s.status === "completed").length;
-  const totalEscrow      = escrowCount.count || 0;
-  const totalUserTrades  = Object.values(userTx).reduce((n, arr) => n + arr.length, 0);
-  const pendingPayments  = Object.keys(pending).length;
-
-  res.json({ activeSlots, completedMM, totalEscrow, totalUserTrades, pendingPayments });
+  res.json({
+    activeSlots:     Object.keys(slots).length,
+    completedMM:     Object.values(mmSessions).filter(s => s.status === "completed").length,
+    totalEscrow:     escrowCount.count || 0,
+    totalUserTrades: Object.values(userTx).reduce((n, arr) => n + arr.length, 0),
+    pendingPayments: Object.keys(pending).length,
+  });
 });
 
 // ─────────────────────────────────────────────
@@ -128,10 +204,7 @@ app.post("/api/feed", (req, res) => {
 app.get("/api/ltc", (req, res) => {
   const priceFile = path.join(DATA_DIR, "ltc_price_cache.json");
   if (fs.existsSync(priceFile)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(priceFile, "utf8"));
-      return res.json(data);
-    } catch {}
+    try { return res.json(JSON.parse(fs.readFileSync(priceFile, "utf8"))); } catch {}
   }
   res.json({ eur: null, usd: null, updatedAt: null });
 });
@@ -149,7 +222,7 @@ app.get("/api/slots", (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-//  SLOT ORDERS — website payment flow
+//  SLOT ORDERS
 // ─────────────────────────────────────────────
 const SLOT_PRICES = {
   First:  { weekly: 5, monthly: 15, lifetime: 40 },
@@ -160,15 +233,24 @@ const SLOT_PRICES = {
 function bcGet(urlPath) {
   return new Promise((resolve) => {
     https.get(`https://api.blockcypher.com/v1/ltc/main${urlPath}`, (res) => {
-      let d = '';
-      res.on('data', c => d += c);
-      res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve({}); } });
-    }).on('error', () => resolve({}));
+      let d = "";
+      res.on("data", c => d += c);
+      res.on("end", () => { try { resolve(JSON.parse(d)); } catch { resolve({}); } });
+    }).on("error", () => resolve({}));
   });
 }
 
-// POST /api/slot-order  — create a new slot payment order
-app.post("/api/slot-order", (req, res) => {
+function loadOrders() {
+  const p = path.join(DATA_DIR, "pending_slot_orders.json");
+  if (!fs.existsSync(p)) return {};
+  try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return {}; }
+}
+
+function saveOrders(orders) {
+  fs.writeFileSync(path.join(DATA_DIR, "pending_slot_orders.json"), JSON.stringify(orders, null, 2));
+}
+
+app.post("/api/slot-order", async (req, res) => {
   const { tier, duration, discord } = req.body;
   const tierPrices = SLOT_PRICES[tier];
   if (!tierPrices || tierPrices[duration] === undefined)
@@ -176,7 +258,7 @@ app.post("/api/slot-order", (req, res) => {
 
   let address, wif;
   try {
-    const litecore = require('litecore-lib');
+    const litecore = require("litecore-lib");
     const pk = new litecore.PrivateKey();
     address = pk.toAddress().toString();
     wif = pk.toWIF();
@@ -184,44 +266,44 @@ app.post("/api/slot-order", (req, res) => {
     return res.status(500).json({ error: "Address generation failed: " + e.message });
   }
 
-  const orderId  = `slot_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const orderId   = `slot_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const amountEur = tierPrices[duration];
-  const ordersPath = path.join(DATA_DIR, "pending_slot_orders.json");
-  let orders = {};
-  if (fs.existsSync(ordersPath)) {
-    try { orders = JSON.parse(fs.readFileSync(ordersPath, "utf8")); } catch {}
-  }
-  orders[orderId] = {
+
+  const order = {
     orderId, tier, duration,
     discord: (discord || "").slice(0, 100),
     amountEur, address, wif,
     status: "pending",
     createdAt: Date.now(),
+    discordMsgId: null,
   };
-  fs.writeFileSync(ordersPath, JSON.stringify(orders, null, 2));
+
+  const orders = loadOrders();
+  orders[orderId] = order;
+  saveOrders(orders);
+
+  const msgId = await notifyDiscordNewOrder(order);
+  if (msgId) {
+    orders[orderId].discordMsgId = msgId;
+    saveOrders(orders);
+  }
+
   res.json({ orderId, address, amountEur, tier, duration });
 });
 
-// GET /api/slot-order/:id  — check payment status (polls BlockCypher)
 app.get("/api/slot-order/:id", async (req, res) => {
-  const ordersPath = path.join(DATA_DIR, "pending_slot_orders.json");
-  let orders = {};
-  if (fs.existsSync(ordersPath)) {
-    try { orders = JSON.parse(fs.readFileSync(ordersPath, "utf8")); } catch {}
-  }
-  const order = orders[req.params.id];
+  const orders = loadOrders();
+  const order  = orders[req.params.id];
   if (!order) return res.status(404).json({ error: "Not found" });
 
   if (order.status === "pending") {
     const bc = await bcGet(`/addrs/${order.address}/balance`);
     if ((bc.total_received || 0) > 0) {
       orders[order.orderId].status = "paid";
-      fs.writeFileSync(ordersPath, JSON.stringify(orders, null, 2));
+      saveOrders(orders);
       order.status = "paid";
-      try {
-        const { pushEvent } = require('./feed');
-        pushEvent("slot", `New slot purchase: ${order.tier} ${order.duration}`, `€${order.amountEur}`, "LTC");
-      } catch {}
+      try { require("./feed").pushEvent("slot", `New slot purchase: ${order.tier} ${order.duration}`, `€${order.amountEur}`, "LTC"); } catch {}
+      notifyDiscordPaid(order);
     }
   }
 
@@ -234,8 +316,6 @@ app.get("/api/slot-order/:id", async (req, res) => {
 // ─────────────────────────────────────────────
 app.get("/api/health", (req, res) => res.json({ ok: true, ts: Date.now() }));
 
-app.listen(PORT, () => {
-  console.log(`[API] Astro Exchange API running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`[API] Astro Exchange API running on port ${PORT}`));
 
 module.exports = app;
