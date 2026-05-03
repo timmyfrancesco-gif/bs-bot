@@ -5,8 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Astro Exchange — Crypto Trading & Middleman Services</title>
   <meta name="description" content="Astro Exchange — Secure crypto trading, escrow, middleman and slot advertising services on Discord." />
-  <!-- ⚠️  Cambia questo con l'IP/dominio pubblico del tuo server -->
-  <script>window.ASTRO_API = "http://YOUR_SERVER_IP:3000";</script>
+  <script>window.ASTRO_API = "https://mio-bot-discord-production.up.railway.app";<\/script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1187,7 +1186,7 @@
   setInterval(fetchPrices, 60000);
 
   // ── LIVE FEED ──
-  const API = (window.ASTRO_API || "").replace(/\/$/, "");
+  const API = (window.ASTRO_API || "").replace(/\/$/,  "");
 
   const FEED_ICONS = {
     order:    "🛒",
@@ -1262,7 +1261,6 @@
     setInterval(loadFeed,  30000);
     setInterval(loadStats, 60000);
   } else {
-    // API not configured — show placeholder message
     document.getElementById("api-status").textContent = "Configure API URL";
     document.getElementById("api-status").style.color = "var(--muted)";
   }
