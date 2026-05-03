@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Astro Exchange — Crypto Trading & Middleman Services</title>
   <meta name="description" content="Astro Exchange — Secure crypto trading, escrow, middleman and slot advertising services on Discord." />
-  <script>window.ASTRO_API = "https://mio-bot-discord-production.up.railway.app";<\/script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+  <script>window.ASTRO_API = "https://mio-bot-discord-production.up.railway.app";</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -756,7 +756,12 @@
 
     .modal-close:hover { color: var(--text); }
 
-    .modal-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
     .modal-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; }
 
     .modal-input-group { margin-bottom: 1.25rem; }
@@ -817,12 +822,26 @@
 
     .pay-address-box:hover { border-color: var(--accent); }
 
-    .pay-copy-hint { font-size: 0.72rem; color: var(--muted); text-align: center; margin-top: 0.3rem; }
+    .pay-copy-hint {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 0.3rem;
+    }
 
-    #pay-qr { display: flex; justify-content: center; margin: 1rem 0; }
+    #pay-qr {
+      display: flex;
+      justify-content: center;
+      margin: 1rem 0;
+    }
+
     #pay-qr canvas, #pay-qr img { border-radius: 8px; }
 
-    .pay-amounts { display: flex; gap: 1rem; margin: 1rem 0; }
+    .pay-amounts {
+      display: flex;
+      gap: 1rem;
+      margin: 1rem 0;
+    }
 
     .pay-amount-box {
       flex: 1;
@@ -833,8 +852,18 @@
       text-align: center;
     }
 
-    .pay-amount-box .val { font-size: 1.15rem; font-weight: 800; color: var(--accent); }
-    .pay-amount-box .lbl { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .pay-amount-box .val {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .pay-amount-box .lbl {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
 
     .pay-status {
       display: flex;
@@ -856,7 +885,11 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .pay-success { text-align: center; padding: 1rem 0; }
+    .pay-success {
+      text-align: center;
+      padding: 1rem 0;
+    }
+
     .pay-success-icon { font-size: 3rem; margin-bottom: 0.75rem; }
 
     .pay-success h3 {
@@ -1370,7 +1403,7 @@
   setInterval(fetchPrices, 60000);
 
   // ── LIVE FEED ──
-  const API = (window.ASTRO_API || "").replace(/\/$/,  "");
+  const API = (window.ASTRO_API || "").replace(/\/$/, "");
 
   const FEED_ICONS = {
     order: "🛒", escrow: "🔒", mm: "🤝", slot: "📢", exchange: "💱",
@@ -1509,6 +1542,7 @@
 
       _payOrder = { ..._payOrder, ...order };
 
+      // Fill step 2
       document.getElementById('pay-eur-val').textContent = `€${order.amountEur}`;
       document.getElementById('pay-ltc-val').textContent = _ltcEur
         ? `${(order.amountEur / _ltcEur).toFixed(5)} LTC`
@@ -1516,6 +1550,7 @@
       document.getElementById('pay-address').textContent = order.address;
       document.getElementById('pay-status-text').textContent = 'Waiting for payment…';
 
+      // QR code
       const qrEl = document.getElementById('pay-qr');
       qrEl.innerHTML = '';
       new QRCode(qrEl, {
@@ -1528,6 +1563,7 @@
       document.getElementById('pay-step-1').style.display = 'none';
       document.getElementById('pay-step-2').style.display = '';
 
+      // Poll for payment
       _pollTimer = setInterval(() => pollPayment(order.orderId), 10000);
 
     } catch(e) {
@@ -1562,6 +1598,7 @@
     });
   }
 
+  // Close modal on Escape
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && document.getElementById('pay-modal').style.display !== 'none')
       closePayment();
