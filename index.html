@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Astro Exchange — Crypto Trading & Middleman Services</title>
   <meta name="description" content="Astro Exchange — Secure crypto trading, escrow, middleman and slot advertising services on Discord." />
+  <!-- ⚠️  Cambia questo con l'IP/dominio pubblico del tuo server -->
+  <script>window.ASTRO_API = "http://YOUR_SERVER_IP:3000";</script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -629,6 +631,124 @@
       .hero-stats { gap: 2rem; }
     }
 
+    /* ── LIVE FEED ── */
+    #live { background: var(--bg); }
+
+    .live-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .live-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      color: #4ade80;
+      font-weight: 600;
+    }
+
+    .live-dot::before {
+      content: '';
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .feed-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .feed-item {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.85rem 1.2rem;
+      font-size: 0.875rem;
+      animation: slideIn .35s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity:0; transform:translateY(-6px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    .feed-icon {
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+
+    .feed-label { flex: 1; color: var(--text); }
+
+    .feed-amount {
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .feed-time {
+      color: var(--muted);
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+
+    .feed-method {
+      font-size: 0.72rem;
+      background: rgba(95,179,196,0.1);
+      border: 1px solid rgba(95,179,196,0.2);
+      color: var(--accent);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .feed-empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 2rem;
+      font-size: 0.875rem;
+    }
+
+    /* ── LIVE STATS BAR ── */
+    .live-stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .lstat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem 1.25rem;
+      text-align: center;
+    }
+
+    .lstat-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .lstat-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-top: 0.2rem;
+    }
+
     /* ── SCROLL FADE ── */
     .fade-in {
       opacity: 0;
@@ -947,6 +1067,49 @@
   </div>
 </section>
 
+<!-- LIVE FEED -->
+<section id="live">
+  <div class="container">
+    <div class="live-header fade-in">
+      <div>
+        <div class="section-label">Real-time</div>
+        <h2>Live Activity</h2>
+        <p class="section-sub" style="margin-top:.5rem;">Every trade, order and escrow — as it happens.</p>
+      </div>
+      <span class="live-dot" id="api-status">Connecting…</span>
+    </div>
+
+    <!-- dynamic stats -->
+    <div class="live-stats-bar fade-in">
+      <div class="lstat">
+        <div class="lstat-value" id="stat-slots">—</div>
+        <div class="lstat-label">Active Slots</div>
+      </div>
+      <div class="lstat">
+        <div class="lstat-value" id="stat-escrow">—</div>
+        <div class="lstat-label">Escrow Trades</div>
+      </div>
+      <div class="lstat">
+        <div class="lstat-value" id="stat-mm">—</div>
+        <div class="lstat-label">MM Completed</div>
+      </div>
+      <div class="lstat">
+        <div class="lstat-value" id="stat-tx">—</div>
+        <div class="lstat-label">Total Transactions</div>
+      </div>
+      <div class="lstat">
+        <div class="lstat-value" id="stat-ltc">—</div>
+        <div class="lstat-label">LTC Price (€)</div>
+      </div>
+    </div>
+
+    <!-- feed -->
+    <div class="feed-list fade-in" id="feed-list">
+      <div class="feed-empty">⏳ Waiting for data from the bot…</div>
+    </div>
+  </div>
+</section>
+
 <!-- CTA -->
 <section id="cta">
   <div class="container text-center fade-in">
@@ -1022,6 +1185,87 @@
 
   fetchPrices();
   setInterval(fetchPrices, 60000);
+
+  // ── LIVE FEED ──
+  const API = (window.ASTRO_API || "").replace(/\/$/, "");
+
+  const FEED_ICONS = {
+    order:    "🛒",
+    escrow:   "🔒",
+    mm:       "🤝",
+    slot:     "📢",
+    exchange: "💱",
+  };
+
+  function timeAgo(ts) {
+    const diff = Date.now() - ts;
+    const m = Math.floor(diff / 60000);
+    const h = Math.floor(diff / 3600000);
+    const d = Math.floor(diff / 86400000);
+    if (m < 1)  return "just now";
+    if (m < 60) return `${m}m ago`;
+    if (h < 24) return `${h}h ago`;
+    return `${d}d ago`;
+  }
+
+  function renderFeed(items) {
+    const el = document.getElementById("feed-list");
+    if (!items.length) {
+      el.innerHTML = '<div class="feed-empty">No activity yet — make a trade on Discord!</div>';
+      return;
+    }
+    el.innerHTML = items.slice(0, 15).map(item => `
+      <div class="feed-item">
+        <span class="feed-icon">${FEED_ICONS[item.type] || "⚡"}</span>
+        <span class="feed-label">${item.label}</span>
+        ${item.method ? `<span class="feed-method">${item.method}</span>` : ""}
+        ${item.amount ? `<span class="feed-amount">${item.amount}</span>` : ""}
+        <span class="feed-time">${timeAgo(item.ts)}</span>
+      </div>
+    `).join("");
+  }
+
+  async function loadFeed() {
+    if (!API || API.includes("YOUR_SERVER")) return;
+    try {
+      const r = await fetch(`${API}/api/feed?limit=15`, { signal: AbortSignal.timeout(5000) });
+      const data = await r.json();
+      renderFeed(data.items || []);
+      document.getElementById("api-status").textContent = "Live";
+    } catch {
+      document.getElementById("api-status").style.color = "var(--muted)";
+      document.getElementById("api-status").textContent = "Offline";
+    }
+  }
+
+  async function loadStats() {
+    if (!API || API.includes("YOUR_SERVER")) return;
+    try {
+      const [statsRes, ltcRes] = await Promise.all([
+        fetch(`${API}/api/stats`, { signal: AbortSignal.timeout(5000) }),
+        fetch(`${API}/api/ltc`,   { signal: AbortSignal.timeout(5000) }),
+      ]);
+      const stats = await statsRes.json();
+      const ltc   = await ltcRes.json();
+
+      document.getElementById("stat-slots").textContent  = stats.activeSlots  ?? "—";
+      document.getElementById("stat-escrow").textContent = stats.totalEscrow  ?? "—";
+      document.getElementById("stat-mm").textContent     = stats.completedMM  ?? "—";
+      document.getElementById("stat-tx").textContent     = stats.totalUserTrades ?? "—";
+      document.getElementById("stat-ltc").textContent    = ltc.eur ? `€${ltc.eur.toFixed(2)}` : "—";
+    } catch {}
+  }
+
+  if (API && !API.includes("YOUR_SERVER")) {
+    loadFeed();
+    loadStats();
+    setInterval(loadFeed,  30000);
+    setInterval(loadStats, 60000);
+  } else {
+    // API not configured — show placeholder message
+    document.getElementById("api-status").textContent = "Configure API URL";
+    document.getElementById("api-status").style.color = "var(--muted)";
+  }
 
   // ── SMOOTH NAV ──
   document.querySelectorAll('a[href^="#"]').forEach(a => {
