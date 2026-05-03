@@ -35,6 +35,17 @@ function load(file) {
   try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return {}; }
 }
 
+function timeAgo(ts) {
+  const diff = Date.now() - ts;
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  if (m < 1)  return "just now";
+  if (m < 60) return `${m}m ago`;
+  if (h < 24) return `${h}h ago`;
+  return `${d}d ago`;
+}
+
 // ─────────────────────────────────────────────
 //  DISCORD REST helper
 // ─────────────────────────────────────────────
@@ -64,6 +75,7 @@ function discordRequest(method, urlPath, body) {
   });
 }
 
+// Manda embed nel canale logs quando arriva un nuovo ordine
 async function notifyDiscordNewOrder(order) {
   const channelId = process.env.DISCORD_LOG_CHANNEL_ID;
   if (!channelId) return null;
@@ -75,12 +87,12 @@ async function notifyDiscordNewOrder(order) {
       title: "🛒 Nuovo ordine slot dal sito",
       color: 0x5FB3C4,
       fields: [
-        { name: "📦 Categoria",     value: `**${order.tier}**`,                     inline: true },
-        { name: "⏱ Durata",              value: labels[order.duration] || order.duration, inline: true },
-        { name: "💶 Importo",       value: `€${order.amountEur}`,               inline: true },
-        { name: "👤 Discord",       value: order.discord || "*Non inserito*",        inline: true },
-        { name: "🔑 Indirizzo LTC", value: `\`${order.address}\``,                   inline: false },
-        { name: "🆔 Order ID",      value: `\`${order.orderId}\``,                   inline: false },
+        { name: "📦 Categoria",  value: `**${order.tier}**`,                    inline: true },
+        { name: "⏱ Durata",     value: labels[order.duration] || order.duration, inline: true },
+        { name: "💶 Importo",    value: `€${order.amountEur}`,                  inline: true },
+        { name: "👤 Discord",    value: order.discord || "*Non inserito*",       inline: true },
+        { name: "🔑 Indirizzo LTC", value: `\`${order.address}\`",              inline: false },
+        { name: "🆔 Order ID",   value: `\`${order.orderId}\``,                 inline: false },
       ],
       timestamp: new Date().toISOString(),
       footer: { text: "Astro Exchange · In attesa di pagamento" },
@@ -88,8 +100,8 @@ async function notifyDiscordNewOrder(order) {
     components: [{
       type: 1,
       components: [
-        { type: 2, style: 3, label: "✅ Attiva Slot", custom_id: `activate_slot_${order.orderId}` },
-        { type: 2, style: 4, label: "❌ Annulla",     custom_id: `cancel_slot_${order.orderId}` },
+        { type: 2, style: 3, label: "✅ Attiva Slot",  custom_id: `activate_slot_${order.orderId}` },
+        { type: 2, style: 4, label: "❌ Annulla",      custom_id: `cancel_slot_${order.orderId}` },
       ],
     }],
   });
@@ -97,22 +109,24 @@ async function notifyDiscordNewOrder(order) {
   return msg?.id || null;
 }
 
+// Aggiorna il messaggio quando il pagamento è confermato
 async function notifyDiscordPaid(order) {
   const channelId = process.env.DISCORD_LOG_CHANNEL_ID;
   if (!channelId) return;
 
   const labels = { weekly: "7 giorni", monthly: "30 giorni", lifetime: "Lifetime" };
 
+  // Manda nuovo messaggio di conferma pagamento
   await discordRequest("POST", `/channels/${channelId}/messages`, {
     embeds: [{
       title: "✅ Pagamento ricevuto — attiva lo slot!",
       color: 0x4ade80,
       fields: [
-        { name: "📦 Categoria", value: `**${order.tier}**`,                     inline: true },
-        { name: "⏱ Durata",          value: labels[order.duration] || order.duration, inline: true },
-        { name: "💶 Importo",   value: `€${order.amountEur}`,               inline: true },
-        { name: "👤 Discord",   value: order.discord || "*Non inserito*",        inline: true },
-        { name: "🆔 Order ID",  value: `\`${order.orderId}\``,                   inline: false },
+        { name: "📦 Categoria",  value: `**${order.tier}**`,                    inline: true },
+        { name: "⏱ Durata",     value: labels[order.duration] || order.duration, inline: true },
+        { name: "💶 Importo",    value: `€${order.amountEur}`,                  inline: true },
+        { name: "👤 Discord",    value: order.discord || "*Non inserito*",       inline: true },
+        { name: "🆔 Order ID",   value: `\`${order.orderId}\``,                 inline: false },
       ],
       timestamp: new Date().toISOString(),
       footer: { text: "Astro Exchange · Pagamento confermato on-chain" },
@@ -125,13 +139,14 @@ async function notifyDiscordPaid(order) {
     }],
   });
 
+  // Modifica il messaggio originale per disabilitare i bottoni
   if (order.discordMsgId) {
     await discordRequest("PATCH", `/channels/${channelId}/messages/${order.discordMsgId}`, {
       components: [{
         type: 1,
         components: [
-          { type: 2, style: 3, label: "✅ Pagato",    custom_id: `activate_slot_${order.orderId}`, disabled: true },
-          { type: 2, style: 4, label: "❌ Annulla",   custom_id: `cancel_slot_${order.orderId}`,   disabled: true },
+          { type: 2, style: 3, label: "✅ Pagato", custom_id: `activate_slot_${order.orderId}`, disabled: true },
+          { type: 2, style: 4, label: "❌ Annulla", custom_id: `cancel_slot_${order.orderId}`, disabled: true },
         ],
       }],
     });
@@ -250,6 +265,7 @@ function saveOrders(orders) {
   fs.writeFileSync(path.join(DATA_DIR, "pending_slot_orders.json"), JSON.stringify(orders, null, 2));
 }
 
+// POST /api/slot-order
 app.post("/api/slot-order", async (req, res) => {
   const { tier, duration, discord } = req.body;
   const tierPrices = SLOT_PRICES[tier];
@@ -282,6 +298,7 @@ app.post("/api/slot-order", async (req, res) => {
   orders[orderId] = order;
   saveOrders(orders);
 
+  // Notifica Discord
   const msgId = await notifyDiscordNewOrder(order);
   if (msgId) {
     orders[orderId].discordMsgId = msgId;
@@ -291,6 +308,7 @@ app.post("/api/slot-order", async (req, res) => {
   res.json({ orderId, address, amountEur, tier, duration });
 });
 
+// GET /api/slot-order/:id
 app.get("/api/slot-order/:id", async (req, res) => {
   const orders = loadOrders();
   const order  = orders[req.params.id];
