@@ -6,6 +6,7 @@
   <title>Astro Exchange — Crypto Trading & Middleman Services</title>
   <meta name="description" content="Astro Exchange — Secure crypto trading, escrow, middleman and slot advertising services on Discord." />
   <script>window.ASTRO_API = "https://mio-bot-discord-production.up.railway.app";<\/script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -147,9 +148,7 @@
       max-width: 800px;
     }
 
-    h1 .highlight {
-      color: var(--accent);
-    }
+    h1 .highlight { color: var(--accent); }
 
     .hero-sub {
       margin-top: 1.25rem;
@@ -180,15 +179,8 @@
       border: none;
     }
 
-    .btn-primary {
-      background: var(--accent);
-      color: #0d0f14;
-    }
-
-    .btn-primary:hover {
-      background: #7cc8d8;
-      transform: translateY(-1px);
-    }
+    .btn-primary { background: var(--accent); color: #0d0f14; }
+    .btn-primary:hover { background: #7cc8d8; transform: translateY(-1px); }
 
     .btn-outline {
       background: transparent;
@@ -285,21 +277,9 @@
       transform: translateY(-2px);
     }
 
-    .card-icon {
-      font-size: 2rem;
-      margin-bottom: 1rem;
-    }
-
-    .card h3 {
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-    }
-
-    .card p {
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
+    .card-icon { font-size: 2rem; margin-bottom: 1rem; }
+    .card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .card p { color: var(--muted); font-size: 0.9rem; }
 
     .card-badge {
       position: absolute;
@@ -325,10 +305,7 @@
       position: relative;
     }
 
-    .step {
-      text-align: center;
-      padding: 2rem 1.5rem;
-    }
+    .step { text-align: center; padding: 2rem 1.5rem; }
 
     .step-num {
       width: 48px; height: 48px;
@@ -414,14 +391,12 @@
       align-items: center;
       padding: 0.65rem 0;
       border-bottom: 1px solid var(--border);
+      gap: 0.5rem;
     }
 
     .price-row:last-child { border-bottom: none; }
 
-    .price-duration {
-      font-size: 0.875rem;
-      color: var(--muted);
-    }
+    .price-duration { font-size: 0.875rem; color: var(--muted); flex: 1; }
 
     .price-amount {
       font-size: 1rem;
@@ -436,10 +411,24 @@
       font-weight: 400;
     }
 
-    .price-crown {
-      color: var(--gold);
-      margin-right: 0.25rem;
+    .price-crown { color: var(--gold); margin-right: 0.25rem; }
+
+    /* ── BUY BUTTON ── */
+    .buy-btn {
+      background: var(--accent);
+      color: #0d0f14;
+      border: none;
+      border-radius: 6px;
+      padding: 0.3rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s, transform .15s;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
+
+    .buy-btn:hover { background: #7cc8d8; transform: scale(1.04); }
 
     /* ── FEES TABLE ── */
     #fees { background: var(--bg2); }
@@ -511,10 +500,7 @@
       background: rgba(95,179,196,0.08);
     }
 
-    .crypto-chip .dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-    }
+    .crypto-chip .dot { width: 8px; height: 8px; border-radius: 50%; }
 
     /* ── TESTIMONIALS ── */
     #vouches { background: var(--bg2); }
@@ -533,24 +519,9 @@
       padding: 1.5rem;
     }
 
-    .vouch-stars {
-      color: var(--gold);
-      font-size: 0.9rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .vouch-text {
-      font-size: 0.9rem;
-      color: var(--text);
-      line-height: 1.6;
-      margin-bottom: 1rem;
-    }
-
-    .vouch-author {
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-
+    .vouch-stars { color: var(--gold); font-size: 0.9rem; margin-bottom: 0.75rem; }
+    .vouch-text { font-size: 0.9rem; color: var(--text); line-height: 1.6; margin-bottom: 1rem; }
+    .vouch-author { font-size: 0.8rem; color: var(--muted); }
     .vouch-author strong { color: var(--accent); }
 
     /* ── CTA ── */
@@ -659,11 +630,7 @@
       animation: pulse 2s ease-in-out infinite;
     }
 
-    .feed-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-    }
+    .feed-list { display: flex; flex-direction: column; gap: 0.6rem; }
 
     .feed-item {
       display: flex;
@@ -682,24 +649,10 @@
       to   { opacity:1; transform:translateY(0); }
     }
 
-    .feed-icon {
-      font-size: 1.2rem;
-      flex-shrink: 0;
-    }
-
+    .feed-icon { font-size: 1.2rem; flex-shrink: 0; }
     .feed-label { flex: 1; color: var(--text); }
-
-    .feed-amount {
-      font-weight: 700;
-      color: var(--accent);
-      white-space: nowrap;
-    }
-
-    .feed-time {
-      color: var(--muted);
-      font-size: 0.75rem;
-      white-space: nowrap;
-    }
+    .feed-amount { font-weight: 700; color: var(--accent); white-space: nowrap; }
+    .feed-time { color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
 
     .feed-method {
       font-size: 0.72rem;
@@ -734,12 +687,7 @@
       text-align: center;
     }
 
-    .lstat-value {
-      font-size: 1.5rem;
-      font-weight: 800;
-      color: var(--accent);
-    }
-
+    .lstat-value { font-size: 1.5rem; font-weight: 800; color: var(--accent); }
     .lstat-label {
       font-size: 0.72rem;
       color: var(--muted);
@@ -755,9 +703,179 @@
       transition: opacity 0.6s ease, transform 0.6s ease;
     }
 
-    .fade-in.visible {
-      opacity: 1;
-      transform: translateY(0);
+    .fade-in.visible { opacity: 1; transform: translateY(0); }
+
+    /* ── PAYMENT MODAL ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      animation: fadeOverlay .2s ease;
+    }
+
+    @keyframes fadeOverlay {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    .modal-box {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 480px;
+      position: relative;
+      animation: slideUp .25s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      transition: color .2s;
+    }
+
+    .modal-close:hover { color: var(--text); }
+
+    .modal-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .modal-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; }
+
+    .modal-input-group { margin-bottom: 1.25rem; }
+
+    .modal-input-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .modal-input-group input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.95rem;
+      padding: 0.65rem 0.9rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .modal-input-group input:focus { border-color: var(--accent); }
+
+    .modal-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #0d0f14;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s;
+    }
+
+    .modal-btn:hover { background: #7cc8d8; }
+    .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .pay-address-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+      word-break: break-all;
+      color: var(--accent);
+      margin: 0.75rem 0;
+      cursor: pointer;
+      transition: border-color .2s;
+    }
+
+    .pay-address-box:hover { border-color: var(--accent); }
+
+    .pay-copy-hint { font-size: 0.72rem; color: var(--muted); text-align: center; margin-top: 0.3rem; }
+
+    #pay-qr { display: flex; justify-content: center; margin: 1rem 0; }
+    #pay-qr canvas, #pay-qr img { border-radius: 8px; }
+
+    .pay-amounts { display: flex; gap: 1rem; margin: 1rem 0; }
+
+    .pay-amount-box {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      text-align: center;
+    }
+
+    .pay-amount-box .val { font-size: 1.15rem; font-weight: 800; color: var(--accent); }
+    .pay-amount-box .lbl { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+    .pay-status {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      justify-content: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 1rem;
+    }
+
+    .pay-spinner {
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .pay-success { text-align: center; padding: 1rem 0; }
+    .pay-success-icon { font-size: 3rem; margin-bottom: 0.75rem; }
+
+    .pay-success h3 {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #4ade80;
+      margin-bottom: 0.5rem;
+    }
+
+    .pay-success p { color: var(--muted); font-size: 0.875rem; line-height: 1.6; }
+
+    .pay-error {
+      background: rgba(248,113,113,0.08);
+      border: 1px solid rgba(248,113,113,0.2);
+      color: #f87171;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
     }
   </style>
 </head>
@@ -927,14 +1045,17 @@
         <div class="price-row">
           <span class="price-duration">⏱ Weekly <em>(7 days)</em></span>
           <span class="price-amount">€5 <em>LTC</em></span>
+          <button class="buy-btn" onclick="openPayment('First','weekly',5)">Buy →</button>
         </div>
         <div class="price-row">
           <span class="price-duration">📅 Monthly <em>(30 days)</em></span>
           <span class="price-amount">€15 <em>LTC</em></span>
+          <button class="buy-btn" onclick="openPayment('First','monthly',15)">Buy →</button>
         </div>
         <div class="price-row">
           <span class="price-duration">♾ Lifetime</span>
           <span class="price-amount">€40 <em>LTC</em></span>
+          <button class="buy-btn" onclick="openPayment('First','lifetime',40)">Buy →</button>
         </div>
       </div>
       <!-- Second -->
@@ -944,14 +1065,17 @@
         <div class="price-row">
           <span class="price-duration">⏱ Weekly <em>(7 days)</em></span>
           <span class="price-amount">€3 <em>LTC</em></span>
+          <button class="buy-btn" onclick="openPayment('Second','weekly',3)">Buy →</button>
         </div>
         <div class="price-row">
           <span class="price-duration">📅 Monthly <em>(30 days)</em></span>
           <span class="price-amount">€9 <em>LTC</em></span>
+          <button class="buy-btn" onclick="openPayment('Second','monthly',9)">Buy →</button>
         </div>
         <div class="price-row">
           <span class="price-duration">♾ Lifetime</span>
           <span class="price-amount">€27 <em>LTC</em></span>
+          <button class="buy-btn" onclick="openPayment('Second','lifetime',27)">Buy →</button>
         </div>
       </div>
       <!-- Third -->
@@ -961,14 +1085,17 @@
         <div class="price-row">
           <span class="price-duration">⏱ Weekly <em>(7 days)</em></span>
           <span class="price-amount">€2 <em>LTC</em></span>
+          <button class="buy-btn" onclick="openPayment('Third','weekly',2)">Buy →</button>
         </div>
         <div class="price-row">
           <span class="price-duration">📅 Monthly <em>(30 days)</em></span>
           <span class="price-amount">€6 <em>LTC</em></span>
+          <button class="buy-btn" onclick="openPayment('Third','monthly',6)">Buy →</button>
         </div>
         <div class="price-row">
           <span class="price-duration">♾ Lifetime</span>
           <span class="price-amount">€18 <em>LTC</em></span>
+          <button class="buy-btn" onclick="openPayment('Third','lifetime',18)">Buy →</button>
         </div>
       </div>
     </div>
@@ -1078,7 +1205,6 @@
       <span class="live-dot" id="api-status">Connecting…</span>
     </div>
 
-    <!-- dynamic stats -->
     <div class="live-stats-bar fade-in">
       <div class="lstat">
         <div class="lstat-value" id="stat-slots">—</div>
@@ -1102,7 +1228,6 @@
       </div>
     </div>
 
-    <!-- feed -->
     <div class="feed-list fade-in" id="feed-list">
       <div class="feed-empty">⏳ Waiting for data from the bot…</div>
     </div>
@@ -1138,12 +1263,68 @@
   <p style="margin-top:1rem;font-size:0.75rem;">© 2026 Astro Exchange. All rights reserved. Cryptocurrency transactions are irreversible — always verify addresses before sending.</p>
 </footer>
 
+<!-- PAYMENT MODAL -->
+<div id="pay-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closePayment()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closePayment()">✕</button>
+
+    <!-- Step 1: Discord username -->
+    <div id="pay-step-1">
+      <div class="modal-title" id="pay-title">Buy Slot</div>
+      <div class="modal-sub" id="pay-sub">Enter your Discord username so we can activate your slot.</div>
+      <div id="pay-error-1" class="pay-error" style="display:none"></div>
+      <div class="modal-input-group">
+        <label>Discord Username</label>
+        <input type="text" id="pay-discord" placeholder="e.g. yourname or yourname#0000" autocomplete="off" />
+      </div>
+      <button class="modal-btn" id="pay-confirm-btn" onclick="startPayment()">Generate Payment Address</button>
+    </div>
+
+    <!-- Step 2: Pay -->
+    <div id="pay-step-2" style="display:none">
+      <div class="modal-title">Send Payment</div>
+      <div class="modal-sub">Send exactly the LTC amount below to this address. We'll detect it automatically.</div>
+
+      <div id="pay-qr"></div>
+
+      <div class="pay-amounts">
+        <div class="pay-amount-box">
+          <div class="val" id="pay-eur-val">—</div>
+          <div class="lbl">EUR</div>
+        </div>
+        <div class="pay-amount-box">
+          <div class="val" id="pay-ltc-val">—</div>
+          <div class="lbl">LTC (approx)</div>
+        </div>
+      </div>
+
+      <div class="pay-address-box" id="pay-address" onclick="copyAddress()" title="Click to copy"></div>
+      <div class="pay-copy-hint">Click address to copy · Send only LTC to this address</div>
+
+      <div class="pay-status">
+        <div class="pay-spinner"></div>
+        <span id="pay-status-text">Waiting for payment…</span>
+      </div>
+    </div>
+
+    <!-- Step 3: Success -->
+    <div id="pay-step-3" style="display:none">
+      <div class="pay-success">
+        <div class="pay-success-icon">✅</div>
+        <h3>Payment Received!</h3>
+        <p>Your payment has been detected on-chain.<br>
+        Join our Discord server and let staff know your order ID to activate your slot.</p>
+        <p style="margin-top:0.75rem;font-size:0.8rem;color:var(--accent);" id="pay-order-id"></p>
+        <button class="modal-btn" style="margin-top:1.25rem;" onclick="closePayment()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   // ── SCROLL FADE ──
   const observer = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting) { e.target.classList.add('visible'); }
-    });
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
   }, { threshold: 0.1 });
 
   document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
@@ -1158,11 +1339,14 @@
   }
 
   // ── LIVE PRICES ──
+  let _ltcEur = null;
+
   async function fetchPrices() {
     try {
       const ids = 'litecoin,bitcoin,ethereum,solana';
-      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=eur,usd`);
+      const res  = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=eur,usd`);
       const data = await res.json();
+      _ltcEur = data.litecoin?.eur || null;
       const fmt = (n, prefix='€') => `${prefix}${n.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2})}`;
       const prices = {
         ltc: fmt(data.litecoin?.eur || 0),
@@ -1171,12 +1355,12 @@
         sol: fmt(data.solana?.eur || 0),
       };
       ['ltc','btc','eth','sol'].forEach(c => {
-        document.getElementById(`${c}-price`).textContent = prices[c];
+        document.getElementById(`${c}-price`).textContent  = prices[c];
         document.getElementById(`${c}-price2`).textContent = prices[c];
       });
-    } catch(e) {
+    } catch {
       ['ltc','btc','eth','sol'].forEach(c => {
-        document.getElementById(`${c}-price`).textContent = '—';
+        document.getElementById(`${c}-price`).textContent  = '—';
         document.getElementById(`${c}-price2`).textContent = '—';
       });
     }
@@ -1189,11 +1373,7 @@
   const API = (window.ASTRO_API || "").replace(/\/$/,  "");
 
   const FEED_ICONS = {
-    order:    "🛒",
-    escrow:   "🔒",
-    mm:       "🤝",
-    slot:     "📢",
-    exchange: "💱",
+    order: "🛒", escrow: "🔒", mm: "🤝", slot: "📢", exchange: "💱",
   };
 
   function timeAgo(ts) {
@@ -1225,9 +1405,9 @@
   }
 
   async function loadFeed() {
-    if (!API || API.includes("YOUR_SERVER")) return;
+    if (!API) return;
     try {
-      const r = await fetch(`${API}/api/feed?limit=15`, { signal: AbortSignal.timeout(5000) });
+      const r    = await fetch(`${API}/api/feed?limit=15`, { signal: AbortSignal.timeout(5000) });
       const data = await r.json();
       renderFeed(data.items || []);
       document.getElementById("api-status").textContent = "Live";
@@ -1238,7 +1418,7 @@
   }
 
   async function loadStats() {
-    if (!API || API.includes("YOUR_SERVER")) return;
+    if (!API) return;
     try {
       const [statsRes, ltcRes] = await Promise.all([
         fetch(`${API}/api/stats`, { signal: AbortSignal.timeout(5000) }),
@@ -1246,16 +1426,16 @@
       ]);
       const stats = await statsRes.json();
       const ltc   = await ltcRes.json();
-
-      document.getElementById("stat-slots").textContent  = stats.activeSlots  ?? "—";
-      document.getElementById("stat-escrow").textContent = stats.totalEscrow  ?? "—";
-      document.getElementById("stat-mm").textContent     = stats.completedMM  ?? "—";
-      document.getElementById("stat-tx").textContent     = stats.totalUserTrades ?? "—";
+      if (ltc.eur) _ltcEur = ltc.eur;
+      document.getElementById("stat-slots").textContent  = stats.activeSlots      ?? "—";
+      document.getElementById("stat-escrow").textContent = stats.totalEscrow      ?? "—";
+      document.getElementById("stat-mm").textContent     = stats.completedMM      ?? "—";
+      document.getElementById("stat-tx").textContent     = stats.totalUserTrades  ?? "—";
       document.getElementById("stat-ltc").textContent    = ltc.eur ? `€${ltc.eur.toFixed(2)}` : "—";
     } catch {}
   }
 
-  if (API && !API.includes("YOUR_SERVER")) {
+  if (API) {
     loadFeed();
     loadStats();
     setInterval(loadFeed,  30000);
@@ -1269,11 +1449,122 @@
   document.querySelectorAll('a[href^="#"]').forEach(a => {
     a.addEventListener('click', e => {
       const target = document.querySelector(a.getAttribute('href'));
-      if (target) {
-        e.preventDefault();
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     });
+  });
+
+  // ── PAYMENT MODAL ──
+  let _payOrder = null;
+  let _pollTimer = null;
+
+  function openPayment(tier, duration, amountEur) {
+    _payOrder = { tier, duration, amountEur };
+    const labels = { weekly: 'Weekly (7 days)', monthly: 'Monthly (30 days)', lifetime: 'Lifetime' };
+    document.getElementById('pay-title').textContent = `Buy ${tier} Slot — ${labels[duration] || duration}`;
+    document.getElementById('pay-sub').textContent   = `€${amountEur} in LTC · Enter your Discord username to proceed.`;
+    document.getElementById('pay-discord').value     = '';
+    document.getElementById('pay-error-1').style.display = 'none';
+    document.getElementById('pay-step-1').style.display  = '';
+    document.getElementById('pay-step-2').style.display  = 'none';
+    document.getElementById('pay-step-3').style.display  = 'none';
+    document.getElementById('pay-modal').style.display   = 'flex';
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => document.getElementById('pay-discord').focus(), 100);
+  }
+
+  function closePayment() {
+    document.getElementById('pay-modal').style.display = 'none';
+    document.body.style.overflow = '';
+    if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+    _payOrder = null;
+  }
+
+  async function startPayment() {
+    if (!_payOrder) return;
+    const discord = document.getElementById('pay-discord').value.trim();
+    const errEl   = document.getElementById('pay-error-1');
+    const btn     = document.getElementById('pay-confirm-btn');
+
+    errEl.style.display = 'none';
+
+    if (!API) {
+      errEl.textContent = 'API not configured. Please try again later.';
+      errEl.style.display = '';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating order…';
+
+    try {
+      const res = await fetch(`${API}/api/slot-order`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ tier: _payOrder.tier, duration: _payOrder.duration, discord }),
+        signal:  AbortSignal.timeout(10000),
+      });
+      const order = await res.json();
+
+      if (!res.ok || !order.address) throw new Error(order.error || 'Failed to create order');
+
+      _payOrder = { ..._payOrder, ...order };
+
+      document.getElementById('pay-eur-val').textContent = `€${order.amountEur}`;
+      document.getElementById('pay-ltc-val').textContent = _ltcEur
+        ? `${(order.amountEur / _ltcEur).toFixed(5)} LTC`
+        : '…';
+      document.getElementById('pay-address').textContent = order.address;
+      document.getElementById('pay-status-text').textContent = 'Waiting for payment…';
+
+      const qrEl = document.getElementById('pay-qr');
+      qrEl.innerHTML = '';
+      new QRCode(qrEl, {
+        text: `litecoin:${order.address}?amount=${_ltcEur ? (order.amountEur / _ltcEur).toFixed(8) : ''}`,
+        width: 180, height: 180,
+        colorDark: '#000000', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+
+      document.getElementById('pay-step-1').style.display = 'none';
+      document.getElementById('pay-step-2').style.display = '';
+
+      _pollTimer = setInterval(() => pollPayment(order.orderId), 10000);
+
+    } catch(e) {
+      errEl.textContent = e.message || 'Something went wrong. Please try again.';
+      errEl.style.display = '';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate Payment Address';
+    }
+  }
+
+  async function pollPayment(orderId) {
+    try {
+      const res   = await fetch(`${API}/api/slot-order/${orderId}`, { signal: AbortSignal.timeout(8000) });
+      const order = await res.json();
+      if (order.status === 'paid') {
+        clearInterval(_pollTimer);
+        _pollTimer = null;
+        document.getElementById('pay-order-id').textContent = `Order ID: ${orderId}`;
+        document.getElementById('pay-step-2').style.display = 'none';
+        document.getElementById('pay-step-3').style.display = '';
+      }
+    } catch {}
+  }
+
+  function copyAddress() {
+    const addr = document.getElementById('pay-address').textContent;
+    navigator.clipboard.writeText(addr).then(() => {
+      const hint = document.querySelector('.pay-copy-hint');
+      hint.textContent = '✓ Address copied!';
+      setTimeout(() => hint.textContent = 'Click address to copy · Send only LTC to this address', 2000);
+    });
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('pay-modal').style.display !== 'none')
+      closePayment();
   });
 </script>
 </body>
