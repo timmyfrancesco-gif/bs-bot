@@ -91,7 +91,7 @@ async function notifyDiscordNewOrder(order) {
         { name: "⏱ Durata",     value: labels[order.duration] || order.duration, inline: true },
         { name: "💶 Importo",    value: `€${order.amountEur}`,                  inline: true },
         { name: "👤 Discord",    value: order.discord || "*Non inserito*",       inline: true },
-        { name: "🔑 Indirizzo LTC", value: `\`${order.address}\`",              inline: false },
+        { name: "🔑 Indirizzo LTC", value: `\`${order.address}\``,              inline: false },
         { name: "🆔 Order ID",   value: `\`${order.orderId}\``,                 inline: false },
       ],
       timestamp: new Date().toISOString(),
