@@ -251,6 +251,15 @@
       from { opacity: 0; transform: translateY(-50px) rotate(-8deg) scale(.75); }
       to   { opacity: 1; transform: translateY(0)    rotate(0)     scale(1);    }
     }
+
+    /* Result card borders */
+    .playing-card.result-win  { box-shadow: 0 0 0 3px #4ade80, 0 8px 24px rgba(0,0,0,.6); transition: box-shadow .3s; }
+    .playing-card.result-lose { box-shadow: 0 0 0 3px #f87171, 0 8px 24px rgba(0,0,0,.6); transition: box-shadow .3s; }
+    .playing-card.result-push { box-shadow: 0 0 0 3px #fb923c, 0 8px 24px rgba(0,0,0,.6); transition: box-shadow .3s; }
+    .bj-hand-val.result-win span  { background: #4ade80; color: #000; }
+    .bj-hand-val.result-lose span { background: #f87171; color: #000; }
+    .bj-hand-val.result-push span { background: #fb923c; color: #000; }
+
     @keyframes cardFlip {
       0%   { transform: scaleX(1); }
       50%  { transform: scaleX(0); }
@@ -271,9 +280,26 @@
     .bj-result-list { font-size: .85rem; color: rgba(255,255,255,.7); text-align: center; }
 
     /* Bet + action panel */
-    .bj-controls { margin-top: 1.5rem; }
-    .bj-bet-panel, .bj-action-panel { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; }
-    .bj-action-panel { display: none; }
+    .bj-controls { margin-top: 1.5rem; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .bj-bet-panel { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; }
+    .bj-action-panel { display: none; flex-direction: column; gap: .6rem; }
+    .bj-act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; }
+    .bj-act-btn {
+      background: #1e2130; border: 1px solid rgba(255,255,255,.1); color: var(--text);
+      border-radius: 10px; padding: .75rem 1rem; font-size: .9rem; font-weight: 600;
+      cursor: pointer; transition: background .15s, border-color .15s;
+      display: flex; align-items: center; gap: .5rem; justify-content: center;
+    }
+    .bj-act-btn:hover:not(:disabled) { background: #2a2f45; border-color: rgba(255,255,255,.25); }
+    .bj-act-btn:disabled { opacity: .3; cursor: default; }
+    .bj-act-btn .act-icon { font-size: 1.1rem; }
+    .bj-surrender-btn {
+      background: none; border: 1px solid rgba(255,100,100,.3); color: rgba(255,130,130,.8);
+      border-radius: 10px; padding: .5rem; font-size: .82rem; font-weight: 600;
+      cursor: pointer; transition: all .15s; width: 100%;
+    }
+    .bj-surrender-btn:hover:not(:disabled) { background: rgba(255,100,100,.08); border-color: #f87171; }
+    .bj-surrender-btn:disabled { opacity: .3; cursor: default; }
     .bj-btn {
       background: var(--bg3); border: 1px solid var(--border); color: var(--text);
       border-radius: 10px; padding: .55rem 1.1rem; font-size: .9rem; font-weight: 600;
@@ -283,8 +309,6 @@
     .bj-btn:disabled { opacity: .35; cursor: default; }
     .bj-btn.primary { background: #1e6e3c; border-color: #2d9e57; }
     .bj-btn.primary:hover:not(:disabled) { background: #2d9e57; }
-    .bj-btn.danger { background: #5c1a1a; border-color: #993333; }
-    .bj-btn.danger:hover:not(:disabled) { background: #993333; }
     .bj-btn.bet-selected { border-color: #4ade80; color: #4ade80; }
     .bj-deal-btn {
       width: 100%; margin-top: .75rem;
@@ -469,11 +493,13 @@
 
         <!-- Action panel -->
         <div class="bj-action-panel" id="bj-action-panel">
-          <button class="bj-btn primary" onclick="bjAct('hit')">🎯 Hit</button>
-          <button class="bj-btn primary" onclick="bjAct('stand')">✋ Stand</button>
-          <button class="bj-btn" id="btn-double" onclick="bjAct('double')">⬆️ Double</button>
-          <button class="bj-btn" id="btn-split" onclick="bjAct('split')">✂️ Split</button>
-          <button class="bj-btn danger" id="btn-surrender" onclick="bjAct('surrender')">🏳️ Resa</button>
+          <div class="bj-act-grid">
+            <button class="bj-act-btn" onclick="bjAct('hit')"><span class="act-icon">📥</span> Chiedi carta</button>
+            <button class="bj-act-btn" onclick="bjAct('stand')"><span class="act-icon">🖐️</span> Resta</button>
+            <button class="bj-act-btn" id="btn-split"   onclick="bjAct('split')"><span class="act-icon">↕️</span> Dividi</button>
+            <button class="bj-act-btn" id="btn-double"  onclick="bjAct('double')"><span class="act-icon">⬆️</span> Raddoppia</button>
+          </div>
+          <button class="bj-surrender-btn" id="btn-surrender" onclick="bjAct('surrender')">🏳️ Resa (50%)</button>
         </div>
       </div>
     </div>
@@ -695,9 +721,13 @@
     return el;
   }
 
-  function _renderCards(hand, container, hideFirst = false, baseDelay = 0) {
+  function _renderCards(hand, container, hideHole = false, baseDelay = 0) {
     container.innerHTML = '';
-    hand.forEach((card, i) => container.appendChild(_makeCard(i === 0 && hideFirst ? null : card, baseDelay + i * 120)));
+    hand.forEach((card, i) => {
+      // hole card = index 1 (dealer's second card), stays face-down while player plays
+      const faceDown = hideHole && i === 1;
+      container.appendChild(_makeCard(faceDown ? null : card, baseDelay + i * 120));
+    });
   }
 
   function _updateBJDisplay(game, revealDealer = false) {
@@ -705,8 +735,13 @@
     const dealerValEl   = document.getElementById('dealer-val');
     const handsArea     = document.getElementById('player-hands-area');
     _renderCards(game.dealerHand, dealerCardsEl, !revealDealer);
-    const vis = revealDealer ? game.dealerHand : game.dealerHand.filter(c => c);
-    dealerValEl.textContent = revealDealer ? _handVal(game.dealerHand) : (_handVal(vis) + (game.dealerHand.length > 1 ? '+' : ''));
+    if (revealDealer) {
+      dealerValEl.textContent = _handVal(game.dealerHand);
+    } else {
+      // show only the first card's value + '?' for the hole card
+      const firstCard = game.dealerHand[0];
+      dealerValEl.textContent = firstCard ? _handVal([firstCard]) + '+?' : '?';
+    }
     handsArea.innerHTML = '';
     game.playerHands.forEach((hand, i) => {
       const isActive = i === game.currentHandIndex && game.phase === 'playing';
@@ -737,10 +772,10 @@
     const pRow = document.createElement('div'); pRow.className = 'bj-cards-row';
     pWrap.appendChild(pVal); pWrap.appendChild(pRow); handsArea.appendChild(pWrap);
     const seq = [
-      () => pRow.appendChild(_makeCard(game.playerHands[0].cards[0], 0)),
-      () => dealerEl.appendChild(_makeCard(null, 0)),
-      () => pRow.appendChild(_makeCard(game.playerHands[0].cards[1], 0)),
-      () => { dealerEl.innerHTML = ''; dealerEl.appendChild(_makeCard(null, 0)); dealerEl.appendChild(_makeCard(game.dealerHand[1], 0)); },
+      () => pRow.appendChild(_makeCard(game.playerHands[0].cards[0], 0)),       // player card 1 face-up
+      () => dealerEl.appendChild(_makeCard(game.dealerHand[0], 0)),             // dealer card 1 face-up
+      () => pRow.appendChild(_makeCard(game.playerHands[0].cards[1], 0)),       // player card 2 face-up
+      () => dealerEl.appendChild(_makeCard(null, 0)),                           // dealer card 2 face-DOWN (hole)
     ];
     for (const step of seq) { step(); await new Promise(r => setTimeout(r, 300)); }
     pVal.innerHTML = `<span>${_handVal(game.playerHands[0].cards)}</span>`;
@@ -876,6 +911,19 @@
   // ── RESULT ──
   function _showResult(results, profit, newBalance) {
     _casinoBal = newBalance; _updateTopbarBal();
+
+    // Apply colored borders to player hands
+    const handsArea = document.getElementById('player-hands-area');
+    const handDivs = handsArea.querySelectorAll('.bj-player-hand');
+    handDivs.forEach((div, i) => {
+      const r = results[i];
+      if (!r) return;
+      const cls = r.profit > 0 ? 'result-win' : r.profit < 0 ? 'result-lose' : 'result-push';
+      div.querySelectorAll('.playing-card').forEach(c => c.classList.add(cls));
+      const valEl = div.querySelector('.bj-hand-val');
+      if (valEl) valEl.classList.add(cls);
+    });
+
     const overlay = document.getElementById('bj-result-overlay');
     const titleEl = document.getElementById('bj-result-title');
     const profitEl = document.getElementById('bj-result-profit');
