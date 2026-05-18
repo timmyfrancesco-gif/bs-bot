@@ -187,60 +187,143 @@
     }
     .bj-back-btn:hover { border-color: var(--accent); color: var(--text); }
 
-    /* Table */
-    .bj-table-wrap {
-      background: radial-gradient(ellipse 80% 100% at 50% 30%, #1b5e20 0%, #0a2d0a 70%, #061806 100%);
-      border-radius: 180px 180px 24px 24px;
-      border: 8px solid #4a3000;
-      box-shadow: 0 0 80px rgba(0,0,0,.9), inset 0 0 60px rgba(0,0,0,.4);
-      padding: 2rem 2rem 2.5rem;
-      min-height: 420px;
-      display: flex; flex-direction: column; gap: 1.5rem;
-      position: relative; overflow: hidden;
-    }
-    .bj-table-wrap::before {
-      content: ''; position: absolute; inset: 0;
-      border-radius: 172px 172px 16px 16px;
-      border: 2px solid rgba(255,255,255,.07); pointer-events: none;
-    }
-    .bj-table-label {
-      text-align: center; font-size: .75rem; letter-spacing: 2px; text-transform: uppercase;
-      color: rgba(255,255,255,.25); font-weight: 600;
-    }
-    .bj-hand-val {
-      text-align: center; font-size: 1.1rem; font-weight: 700;
-      color: rgba(255,255,255,.8); margin-bottom: .5rem;
-    }
-    .bj-hand-val span { background: rgba(0,0,0,.4); border-radius: 6px; padding: .2rem .6rem; }
-    .bj-cards-row { display: flex; gap: .6rem; justify-content: center; flex-wrap: wrap; min-height: 130px; align-items: center; }
+    /* ── BLACKJACK SHUFFLE-STYLE LAYOUT ── */
+    #casino-bj-view { background: #0a0c12; border-radius: 16px; overflow: hidden; margin-top: 1rem; }
+    .bj-layout { display: flex; min-height: 580px; }
 
-    /* Player hand area with hand index indicator */
-    .bj-player-hands { display: flex; flex-direction: column; gap: 1.2rem; }
-    .bj-player-hand { border: 2px solid transparent; border-radius: 12px; padding: .5rem; transition: border-color .3s; }
-    .bj-player-hand.active-hand { border-color: rgba(255,220,50,.5); background: rgba(255,220,50,.05); }
+    .bj-left {
+      width: 290px; flex-shrink: 0; background: #13151f;
+      border-right: 1px solid rgba(255,255,255,.06);
+      padding: 1.25rem; display: flex; flex-direction: column; gap: .9rem;
+    }
+    .bj-back-link {
+      background: none; border: none; color: var(--muted); font-size: .8rem;
+      cursor: pointer; padding: 0; text-align: left; transition: color .15s;
+    }
+    .bj-back-link:hover { color: var(--text); }
+
+    .bj-bet-label { font-size: .72rem; color: var(--muted); font-weight: 600; letter-spacing: .5px; }
+    .bj-bet-ltc-disp { font-size: .72rem; color: #b5a06e; font-weight: 600; text-align: right; }
+    .bj-bet-header { display: flex; justify-content: space-between; align-items: center; }
+
+    .bj-bet-input-row {
+      display: flex; align-items: center; gap: .4rem;
+      background: #0d0f18; border: 1px solid rgba(255,255,255,.1);
+      border-radius: 10px; padding: .6rem .75rem;
+    }
+    .bj-eur-sign { color: #5FB3C4; font-size: 1rem; font-weight: 700; flex-shrink: 0; }
+    .bj-bet-input {
+      flex: 1; background: none; border: none; color: #fff;
+      font-size: 1.05rem; font-weight: 700; outline: none; min-width: 0;
+    }
+    .bj-bet-input::-webkit-inner-spin-button,
+    .bj-bet-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .bj-frac-btn {
+      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1);
+      color: var(--text); border-radius: 6px; padding: .18rem .5rem;
+      font-size: .78rem; font-weight: 700; cursor: pointer; flex-shrink: 0; transition: background .15s;
+    }
+    .bj-frac-btn:hover { background: rgba(255,255,255,.16); }
+
+    .bj-scommetti-btn {
+      width: 100%; border: none; color: #fff;
+      border-radius: 10px; padding: .8rem; font-size: .95rem; font-weight: 800;
+      cursor: pointer; transition: background .2s; letter-spacing: .3px;
+      background: #1e6e3c;
+    }
+    .bj-scommetti-btn:hover:not(:disabled) { background: #2d9e57; }
+    .bj-scommetti-btn:disabled { background: #1c1f2e; color: rgba(255,255,255,.28); cursor: default; }
+
+    .bj-action-panel { display: none; flex-direction: column; gap: .5rem; }
+    .bj-act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+    .bj-act-btn {
+      background: #1e2130; border: 1px solid rgba(255,255,255,.08); color: var(--text);
+      border-radius: 9px; padding: .65rem .5rem; font-size: .83rem; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+      display: flex; align-items: center; justify-content: center; gap: .35rem;
+    }
+    .bj-act-btn:hover:not(:disabled) { background: #262a3d; }
+    .bj-act-btn:disabled { opacity: .25; cursor: default; }
+    .bj-surrender-btn {
+      background: none; border: 1px solid rgba(255,100,100,.22); color: rgba(255,140,140,.7);
+      border-radius: 9px; padding: .42rem; font-size: .78rem; font-weight: 600;
+      cursor: pointer; transition: all .15s; width: 100%;
+    }
+    .bj-surrender-btn:hover:not(:disabled) { background: rgba(255,100,100,.07); }
+    .bj-surrender-btn:disabled { opacity: .22; cursor: default; }
+
+    .bj-insurance-prompt {
+      background: rgba(251,191,36,.06); border: 1px solid rgba(251,191,36,.22);
+      border-radius: 10px; padding: .7rem; text-align: center;
+    }
+    .bj-insurance-prompt p { color: #fbbf24; font-size: .8rem; margin-bottom: .55rem; }
+    .bj-ins-btns { display: flex; gap: .5rem; justify-content: center; }
+    .bj-btn {
+      background: #1e2130; border: 1px solid rgba(255,255,255,.09); color: var(--text);
+      border-radius: 9px; padding: .42rem .9rem; font-size: .83rem; font-weight: 600;
+      cursor: pointer; transition: all .15s;
+    }
+    .bj-btn:hover:not(:disabled) { background: #262a3d; }
+    .bj-btn.primary { background: #1e6e3c; border-color: #2d9e57; }
+    .bj-btn.primary:hover:not(:disabled) { background: #2d9e57; }
+
+    .bj-status-msg {
+      text-align: center; font-size: .88rem; font-weight: 700;
+      min-height: 1.3em; transition: color .3s;
+    }
+
+    /* Right: cards */
+    .bj-right {
+      flex: 1; background: #0a0c12;
+      display: flex; flex-direction: column; justify-content: space-between;
+      padding: 2rem 2.5rem; gap: 1rem;
+    }
+    .bj-dealer-area,
+    .bj-player-area { display: flex; flex-direction: column; gap: .55rem; }
+
+    .bj-hand-bubble {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,.6); border: 1px solid rgba(255,255,255,.12);
+      border-radius: 20px; padding: .2rem .75rem;
+      font-size: .9rem; font-weight: 700; color: #fff; min-width: 2rem; transition: all .3s;
+    }
+    .bj-hand-bubble.result-win  { background: #4ade80; color: #000; border-color: #4ade80; }
+    .bj-hand-bubble.result-lose { background: #f87171; color: #000; border-color: #f87171; }
+    .bj-hand-bubble.result-push { background: #fb923c; color: #000; border-color: #fb923c; }
+
+    .bj-cards-row { display: flex; gap: .55rem; flex-wrap: wrap; align-items: center; min-height: 115px; }
+    .bj-player-hands { display: flex; flex-direction: column; gap: 1rem; }
+    .bj-player-hand { display: flex; flex-direction: column; gap: .45rem; }
+
+    .bj-table-banner {
+      text-align: center; color: rgba(255,255,255,.14);
+      font-size: .68rem; font-weight: 700; letter-spacing: 1.5px;
+      text-transform: uppercase; line-height: 1.9;
+    }
 
     /* PLAYING CARD */
     .playing-card {
-      width: 78px; height: 115px;
-      border-radius: 9px;
-      background: #fff;
-      border: 1px solid rgba(0,0,0,.12);
-      box-shadow: 0 8px 24px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.4), inset 0 0 0 1px rgba(255,255,255,.9);
+      width: 78px; height: 115px; border-radius: 9px; background: #fff;
+      border: 1px solid rgba(0,0,0,.1);
+      box-shadow: 0 4px 14px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.85);
       display: flex; flex-direction: column; justify-content: space-between;
       padding: 5px 7px;
       font-family: 'Georgia','Times New Roman',serif; font-weight: bold;
       position: relative; user-select: none;
-      animation: cardDeal .35s cubic-bezier(.34,1.56,.64,1) both;
-      flex-shrink: 0;
+      animation: cardDeal .3s cubic-bezier(.34,1.56,.64,1) both;
+      flex-shrink: 0; transition: box-shadow .3s;
     }
     .playing-card.red { color: #cc0000; }
     .playing-card.black { color: #111; }
     .playing-card.face-down {
-      background:
-        repeating-linear-gradient(45deg, #1565c0 0px, #1565c0 4px, #0d47a1 4px, #0d47a1 12px);
-      border: 2px solid rgba(255,255,255,.2);
-      box-shadow: 0 8px 24px rgba(0,0,0,.7);
+      background: linear-gradient(145deg, #6d28d9 0%, #4c1d95 100%);
+      border: 1px solid rgba(255,255,255,.15);
+      box-shadow: 0 4px 14px rgba(0,0,0,.5);
     }
+    .playing-card.result-win  { box-shadow: 0 0 0 3px #4ade80, 0 4px 14px rgba(0,0,0,.45); }
+    .playing-card.result-lose { box-shadow: 0 0 0 3px #f87171, 0 4px 14px rgba(0,0,0,.45); }
+    .playing-card.result-push { box-shadow: 0 0 0 3px #fb923c, 0 4px 14px rgba(0,0,0,.45); }
+
     .card-corner { display: flex; flex-direction: column; line-height: 1; }
     .card-corner.bottom { transform: rotate(180deg); align-self: flex-end; }
     .card-rank { font-size: 17px; }
@@ -248,96 +331,18 @@
     .card-center { font-size: 38px; text-align: center; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
 
     @keyframes cardDeal {
-      from { opacity: 0; transform: translateY(-50px) rotate(-8deg) scale(.75); }
-      to   { opacity: 1; transform: translateY(0)    rotate(0)     scale(1);    }
+      from { opacity: 0; transform: translateY(-35px) scale(.82); }
+      to   { opacity: 1; transform: translateY(0)    scale(1); }
     }
 
-    /* Result card borders */
-    .playing-card.result-win  { box-shadow: 0 0 0 3px #4ade80, 0 8px 24px rgba(0,0,0,.6); transition: box-shadow .3s; }
-    .playing-card.result-lose { box-shadow: 0 0 0 3px #f87171, 0 8px 24px rgba(0,0,0,.6); transition: box-shadow .3s; }
-    .playing-card.result-push { box-shadow: 0 0 0 3px #fb923c, 0 8px 24px rgba(0,0,0,.6); transition: box-shadow .3s; }
-    .bj-hand-val.result-win span  { background: #4ade80; color: #000; }
-    .bj-hand-val.result-lose span { background: #f87171; color: #000; }
-    .bj-hand-val.result-push span { background: #fb923c; color: #000; }
-
-    @keyframes cardFlip {
-      0%   { transform: scaleX(1); }
-      50%  { transform: scaleX(0); }
-      100% { transform: scaleX(1); }
-    }
-    .card-reveal { animation: cardFlip .4s ease-in-out; }
-
-    /* Result overlay */
-    .bj-result-overlay {
-      position: absolute; inset: 0; border-radius: 172px 172px 16px 16px;
-      background: rgba(0,0,0,.75); backdrop-filter: blur(4px);
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .75rem;
-      z-index: 10; animation: fadeIn .3s ease;
-    }
-    @keyframes fadeIn { from{opacity:0}to{opacity:1} }
-    .bj-result-title { font-size: 2rem; font-weight: 900; }
-    .bj-result-profit { font-size: 1.4rem; font-weight: 700; }
-    .bj-result-list { font-size: .85rem; color: rgba(255,255,255,.7); text-align: center; }
-
-    /* Bet + action panel */
-    .bj-controls { margin-top: 1.5rem; max-width: 480px; margin-left: auto; margin-right: auto; }
-    .bj-bet-panel { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; }
-    .bj-action-panel { display: none; flex-direction: column; gap: .6rem; }
-    .bj-act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; }
-    .bj-act-btn {
-      background: #1e2130; border: 1px solid rgba(255,255,255,.1); color: var(--text);
-      border-radius: 10px; padding: .75rem 1rem; font-size: .9rem; font-weight: 600;
-      cursor: pointer; transition: background .15s, border-color .15s;
-      display: flex; align-items: center; gap: .5rem; justify-content: center;
-    }
-    .bj-act-btn:hover:not(:disabled) { background: #2a2f45; border-color: rgba(255,255,255,.25); }
-    .bj-act-btn:disabled { opacity: .3; cursor: default; }
-    .bj-act-btn .act-icon { font-size: 1.1rem; }
-    .bj-surrender-btn {
-      background: none; border: 1px solid rgba(255,100,100,.3); color: rgba(255,130,130,.8);
-      border-radius: 10px; padding: .5rem; font-size: .82rem; font-weight: 600;
-      cursor: pointer; transition: all .15s; width: 100%;
-    }
-    .bj-surrender-btn:hover:not(:disabled) { background: rgba(255,100,100,.08); border-color: #f87171; }
-    .bj-surrender-btn:disabled { opacity: .3; cursor: default; }
-    .bj-btn {
-      background: var(--bg3); border: 1px solid var(--border); color: var(--text);
-      border-radius: 10px; padding: .55rem 1.1rem; font-size: .9rem; font-weight: 600;
-      cursor: pointer; transition: all .15s;
-    }
-    .bj-btn:hover:not(:disabled) { background: var(--card-hover); border-color: var(--accent); }
-    .bj-btn:disabled { opacity: .35; cursor: default; }
-    .bj-btn.primary { background: #1e6e3c; border-color: #2d9e57; }
-    .bj-btn.primary:hover:not(:disabled) { background: #2d9e57; }
-    .bj-btn.bet-selected { border-color: #4ade80; color: #4ade80; }
-    .bj-deal-btn {
-      width: 100%; margin-top: .75rem;
-      background: #1e6e3c; border: none; color: #fff;
-      border-radius: 12px; padding: .85rem; font-size: 1.1rem; font-weight: 800;
-      cursor: pointer; letter-spacing: .5px; transition: background .2s;
-    }
-    .bj-deal-btn:hover:not(:disabled) { background: #2d9e57; }
-    .bj-deal-btn:disabled { opacity: .4; cursor: default; }
-    .bj-custom-bet {
-      background: var(--bg3); border: 1px solid var(--border); color: var(--text);
-      border-radius: 10px; padding: .5rem .75rem; width: 90px; font-size: .9rem; outline: none;
-    }
-    .bj-custom-bet:focus { border-color: var(--accent); }
-    .bj-status-msg { text-align: center; color: var(--muted); font-size: .85rem; margin-top: .5rem; min-height: 1.2em; }
-
-    /* Insurance prompt */
-    .bj-insurance-prompt {
-      text-align: center; padding: 1rem;
-      background: rgba(0,0,0,.4); border-radius: 12px; border: 1px solid rgba(255,200,50,.3);
-    }
-    .bj-insurance-prompt p { color: #fbbf24; font-size: .9rem; margin-bottom: .75rem; }
-
-    @media(max-width:600px){
+    @media(max-width:700px){
+      .bj-layout { flex-direction: column; }
+      .bj-left { width: 100%; border-right: none; border-bottom: 1px solid rgba(255,255,255,.06); }
+      .bj-right { padding: 1.25rem; }
       .casino-game-grid { grid-template-columns: repeat(3,1fr); }
-      .bj-table-wrap { padding: 1.5rem 1rem 2rem; border-radius: 100px 100px 16px 16px; border-width: 5px; }
       .playing-card { width: 62px; height: 93px; }
       .card-rank { font-size: 14px; }
-      .card-center { font-size: 30px; }
+      .card-center { font-size: 28px; }
     }
   </style>
 </head>
@@ -427,80 +432,77 @@
 
     <!-- BLACKJACK VIEW -->
     <div id="casino-bj-view" style="display:none">
-      <!-- Balance bar (same as lobby) -->
-      <div class="casino-topbar">
-        <img class="ltc-logo" src="https://s2.coinmarketcap.com/static/img/coins/64x64/2.png" alt="LTC">
-        <span class="bal-ltc" id="bj-topbar-ltc">0.0000 LTC</span>
-        <span class="bal-sep">·</span>
-        <span class="bal-eur" id="bj-topbar-eur">0.00€</span>
-        <button class="bal-logout" style="margin-left:auto" onclick="closeBJ()">← Lobby</button>
-      </div>
+      <div class="bj-layout">
 
-      <!-- Table -->
-      <div class="bj-table-wrap" id="bj-table">
-        <!-- Result overlay (hidden) -->
-        <div class="bj-result-overlay" id="bj-result-overlay" style="display:none">
-          <div class="bj-result-title" id="bj-result-title">—</div>
-          <div class="bj-result-profit" id="bj-result-profit"></div>
-          <div class="bj-result-list" id="bj-result-list"></div>
-          <div class="bj-result-btns" style="display:flex;gap:.75rem;margin-top:.5rem;flex-wrap:wrap;justify-content:center">
-            <button class="bj-btn primary" onclick="bjPlayAgain()">🔄 Ancora</button>
-            <button class="bj-btn" onclick="closeBJ()">🏠 Lobby</button>
+        <!-- LEFT: controls -->
+        <div class="bj-left">
+          <button class="bj-back-link" onclick="closeBJ()">← Lobby</button>
+
+          <!-- Balance display -->
+          <div style="font-size:.78rem;color:var(--muted);">
+            <span id="bj-topbar-eur" style="color:#4ade80;font-weight:700">5.00€</span>
+            &nbsp;·&nbsp;
+            <span id="bj-topbar-ltc" style="color:#b5a06e;font-weight:600">0.0000 LTC</span>
+          </div>
+
+          <!-- Status -->
+          <div class="bj-status-msg" id="bj-status"></div>
+
+          <!-- Insurance -->
+          <div class="bj-insurance-prompt" id="bj-insurance-prompt" style="display:none">
+            <p>🛡️ Dealer mostra Asso — assicurazione? (paga 2:1)</p>
+            <div class="bj-ins-btns">
+              <button class="bj-btn primary" id="bj-ins-yes-btn" onclick="bjInsurance(true)">✅ Sì</button>
+              <button class="bj-btn" onclick="bjInsurance(false)">❌ No</button>
+            </div>
+          </div>
+
+          <!-- Bet panel -->
+          <div id="bj-bet-panel">
+            <div class="bj-bet-header">
+              <span class="bj-bet-label">Importo scommessa</span>
+              <span class="bj-bet-ltc-disp" id="bj-bet-ltc">0.00000000 LTC</span>
+            </div>
+            <div class="bj-bet-input-row" style="margin:.4rem 0 .6rem">
+              <span class="bj-eur-sign">€</span>
+              <input type="number" class="bj-bet-input" id="bj-custom-bet" min="0.5" step="0.5" value="1" oninput="selectCustomBet(this.value)">
+              <button class="bj-frac-btn" onclick="halveBet()">½</button>
+              <button class="bj-frac-btn" onclick="doubleBet()">2x</button>
+            </div>
+            <button class="bj-scommetti-btn" id="bj-deal-btn" onclick="dealBJ()">Scommetti</button>
+          </div>
+
+          <!-- Action panel -->
+          <div class="bj-action-panel" id="bj-action-panel">
+            <div class="bj-act-grid">
+              <button class="bj-act-btn" onclick="bjAct('hit')">📥 Chiedi carta</button>
+              <button class="bj-act-btn" onclick="bjAct('stand')">🖐️ Resta</button>
+              <button class="bj-act-btn" id="btn-split"  onclick="bjAct('split')">↕️ Dividi</button>
+              <button class="bj-act-btn" id="btn-double" onclick="bjAct('double')">⬆️ Raddoppia</button>
+            </div>
+            <button class="bj-surrender-btn" id="btn-surrender" onclick="bjAct('surrender')">🏳️ Resa (50%)</button>
           </div>
         </div>
 
-        <!-- Dealer area -->
-        <div>
-          <div class="bj-table-label">D E A L E R</div>
-          <div class="bj-hand-val"><span id="dealer-val">?</span></div>
-          <div class="bj-cards-row" id="dealer-cards"></div>
-        </div>
+        <!-- RIGHT: cards -->
+        <div class="bj-right">
+          <!-- Dealer -->
+          <div class="bj-dealer-area">
+            <div class="bj-hand-bubble" id="dealer-val">?</div>
+            <div class="bj-cards-row" id="dealer-cards"></div>
+          </div>
 
-        <!-- Divider line -->
-        <div style="border-top:1px solid rgba(255,255,255,.08)"></div>
+          <!-- Banner -->
+          <div class="bj-table-banner">
+            BLACKJACK PAYS 3 TO 2<br>INSURANCE PAYS 2 TO 1
+          </div>
 
-        <!-- Player area -->
-        <div>
-          <div class="bj-table-label">P L A Y E R</div>
-          <div id="player-hands-area" class="bj-player-hands"></div>
-        </div>
-      </div>
-
-      <!-- Controls -->
-      <div class="bj-controls">
-        <!-- Status message -->
-        <div class="bj-status-msg" id="bj-status"></div>
-
-        <!-- Insurance prompt -->
-        <div class="bj-insurance-prompt" id="bj-insurance-prompt" style="display:none">
-          <p>🛡️ Il dealer mostra un Asso! Vuoi l'assicurazione? (max metà puntata, paga 2:1 se dealer BJ)</p>
-          <div style="display:flex;gap:.75rem;justify-content:center">
-            <button class="bj-btn primary" id="bj-ins-yes-btn" onclick="bjInsurance(true)">✅ Sì</button>
-            <button class="bj-btn" onclick="bjInsurance(false)">❌ No</button>
+          <!-- Player -->
+          <div class="bj-player-area">
+            <div id="player-hands-area" class="bj-player-hands"></div>
           </div>
         </div>
 
-        <!-- Bet panel -->
-        <div class="bj-bet-panel" id="bj-bet-panel">
-          <button class="bj-btn bet-chip" data-amt="1"  onclick="selectChip(this,1)">1€</button>
-          <button class="bj-btn bet-chip" data-amt="5"  onclick="selectChip(this,5)">5€</button>
-          <button class="bj-btn bet-chip" data-amt="10" onclick="selectChip(this,10)">10€</button>
-          <button class="bj-btn bet-chip" data-amt="25" onclick="selectChip(this,25)">25€</button>
-          <button class="bj-btn bet-chip" data-amt="50" onclick="selectChip(this,50)">50€</button>
-          <input type="number" class="bj-custom-bet" id="bj-custom-bet" placeholder="Altro" min="1" oninput="selectCustomBet(this.value)">
-          <button class="bj-deal-btn" id="bj-deal-btn" onclick="dealBJ()">DEAL ♠</button>
-        </div>
-
-        <!-- Action panel -->
-        <div class="bj-action-panel" id="bj-action-panel">
-          <div class="bj-act-grid">
-            <button class="bj-act-btn" onclick="bjAct('hit')"><span class="act-icon">📥</span> Chiedi carta</button>
-            <button class="bj-act-btn" onclick="bjAct('stand')"><span class="act-icon">🖐️</span> Resta</button>
-            <button class="bj-act-btn" id="btn-split"   onclick="bjAct('split')"><span class="act-icon">↕️</span> Dividi</button>
-            <button class="bj-act-btn" id="btn-double"  onclick="bjAct('double')"><span class="act-icon">⬆️</span> Raddoppia</button>
-          </div>
-          <button class="bj-surrender-btn" id="btn-surrender" onclick="bjAct('surrender')">🏳️ Resa (50%)</button>
-        </div>
       </div>
     </div>
   </div>
@@ -689,25 +691,31 @@
     _bjGame = null; _bjLocked = false;
     document.getElementById('dealer-cards').innerHTML = '';
     document.getElementById('player-hands-area').innerHTML = '';
-    document.getElementById('dealer-val').textContent = '?';
-    document.getElementById('bj-result-overlay').style.display = 'none';
+    const dv = document.getElementById('dealer-val');
+    dv.textContent = '?'; dv.className = 'bj-hand-bubble';
     document.getElementById('bj-insurance-prompt').style.display = 'none';
-    document.getElementById('bj-bet-panel').style.display = 'flex';
+    document.getElementById('bj-bet-panel').style.display = 'block';
     document.getElementById('bj-action-panel').style.display = 'none';
-    document.getElementById('bj-status').textContent = '';
+    const st = document.getElementById('bj-status'); st.textContent = ''; st.style.color = '';
     document.getElementById('bj-deal-btn').disabled = false;
-    document.querySelectorAll('.bet-chip').forEach(b => b.classList.toggle('bet-selected', parseInt(b.dataset.amt) === _bjBet));
+    _updateBetLtc();
   }
 
-  function selectChip(btn, amt) {
-    _bjBet = amt;
-    document.getElementById('bj-custom-bet').value = '';
-    document.querySelectorAll('.bet-chip').forEach(b => b.classList.remove('bet-selected'));
-    btn.classList.add('bet-selected');
-  }
   function selectCustomBet(val) {
-    const n = Math.round(parseFloat(val));
-    if (!isNaN(n) && n >= 1) { _bjBet = n; document.querySelectorAll('.bet-chip').forEach(b => b.classList.remove('bet-selected')); }
+    const n = parseFloat(val);
+    if (!isNaN(n) && n >= 0.5) { _bjBet = n; _updateBetLtc(); }
+  }
+  function halveBet() {
+    _bjBet = Math.max(0.5, Math.round(_bjBet / 2 * 100) / 100);
+    document.getElementById('bj-custom-bet').value = _bjBet; _updateBetLtc();
+  }
+  function doubleBet() {
+    _bjBet = Math.min(_casinoBal, _bjBet * 2);
+    document.getElementById('bj-custom-bet').value = _bjBet; _updateBetLtc();
+  }
+  function _updateBetLtc() {
+    const el = document.getElementById('bj-bet-ltc');
+    if (el) el.textContent = (_bjBet / (_ltcEur || 85)).toFixed(8) + ' LTC';
   }
 
   // ── CARD RENDERING ──
@@ -738,22 +746,20 @@
     if (revealDealer) {
       dealerValEl.textContent = _handVal(game.dealerHand);
     } else {
-      // show only the first card's value + '?' for the hole card
       const firstCard = game.dealerHand[0];
       dealerValEl.textContent = firstCard ? _handVal([firstCard]) + '+?' : '?';
     }
     handsArea.innerHTML = '';
     game.playerHands.forEach((hand, i) => {
-      const isActive = i === game.currentHandIndex && game.phase === 'playing';
       const wrap = document.createElement('div');
-      wrap.className = 'bj-player-hand' + (isActive ? ' active-hand' : '');
-      const lbl = document.createElement('div'); lbl.className = 'bj-hand-val';
+      wrap.className = 'bj-player-hand';
+      const bubble = document.createElement('div'); bubble.className = 'bj-hand-bubble';
       const val = _handVal(hand.cards);
-      const suffix = hand.doubled ? ' (raddoppio)' : hand.surrendered ? ' (resa)' : '';
-      lbl.innerHTML = `<span>${game.playerHands.length > 1 ? `Mano ${i+1}: ` : ''}${val}${suffix}</span>`;
+      const suffix = hand.doubled ? ' 2x' : hand.surrendered ? ' resa' : '';
+      bubble.textContent = (game.playerHands.length > 1 ? `M${i+1}: ` : '') + val + suffix;
       const row = document.createElement('div'); row.className = 'bj-cards-row';
       hand.cards.forEach((card, ci) => row.appendChild(_makeCard(card, ci * 100)));
-      wrap.appendChild(lbl); wrap.appendChild(row); handsArea.appendChild(wrap);
+      wrap.appendChild(row); wrap.appendChild(bubble); handsArea.appendChild(wrap);
     });
     if (game.phase === 'playing' && !revealDealer) {
       const cur = game.playerHands[game.currentHandIndex];
@@ -767,10 +773,10 @@
     const dealerEl = document.getElementById('dealer-cards');
     const handsArea = document.getElementById('player-hands-area');
     dealerEl.innerHTML = ''; handsArea.innerHTML = '';
-    const pWrap = document.createElement('div'); pWrap.className = 'bj-player-hand active-hand';
-    const pVal = document.createElement('div'); pVal.className = 'bj-hand-val'; pVal.innerHTML = '<span>...</span>';
+    const pWrap = document.createElement('div'); pWrap.className = 'bj-player-hand';
     const pRow = document.createElement('div'); pRow.className = 'bj-cards-row';
-    pWrap.appendChild(pVal); pWrap.appendChild(pRow); handsArea.appendChild(pWrap);
+    const pBubble = document.createElement('div'); pBubble.className = 'bj-hand-bubble'; pBubble.textContent = '...';
+    pWrap.appendChild(pRow); pWrap.appendChild(pBubble); handsArea.appendChild(pWrap);
     const seq = [
       () => pRow.appendChild(_makeCard(game.playerHands[0].cards[0], 0)),       // player card 1 face-up
       () => dealerEl.appendChild(_makeCard(game.dealerHand[0], 0)),             // dealer card 1 face-up
@@ -778,7 +784,7 @@
       () => dealerEl.appendChild(_makeCard(null, 0)),                           // dealer card 2 face-DOWN (hole)
     ];
     for (const step of seq) { step(); await new Promise(r => setTimeout(r, 300)); }
-    pVal.innerHTML = `<span>${_handVal(game.playerHands[0].cards)}</span>`;
+    pBubble.textContent = _handVal(game.playerHands[0].cards);
     await new Promise(r => setTimeout(r, 200));
   }
 
@@ -810,7 +816,7 @@
     };
 
     document.getElementById('bj-bet-panel').style.display = 'none';
-    document.getElementById('bj-result-overlay').style.display = 'none';
+    document.getElementById('bj-status').textContent = '';
     document.getElementById('bj-status').textContent = '';
 
     await _animateDeal(_bjGame);
@@ -912,47 +918,52 @@
   function _showResult(results, profit, newBalance) {
     _casinoBal = newBalance; _updateTopbarBal();
 
-    // Apply colored borders to player hands
+    // Color dealer bubble
+    const dealerBubble = document.getElementById('dealer-val');
+    if (dealerBubble) dealerBubble.className = 'bj-hand-bubble'; // neutral
+
+    // Color player cards and bubbles
     const handsArea = document.getElementById('player-hands-area');
-    const handDivs = handsArea.querySelectorAll('.bj-player-hand');
-    handDivs.forEach((div, i) => {
-      const r = results[i];
-      if (!r) return;
+    handsArea.querySelectorAll('.bj-player-hand').forEach((div, i) => {
+      const r = results[i]; if (!r) return;
       const cls = r.profit > 0 ? 'result-win' : r.profit < 0 ? 'result-lose' : 'result-push';
       div.querySelectorAll('.playing-card').forEach(c => c.classList.add(cls));
-      const valEl = div.querySelector('.bj-hand-val');
-      if (valEl) valEl.classList.add(cls);
+      const bubble = div.querySelector('.bj-hand-bubble');
+      if (bubble) bubble.classList.add(cls);
     });
 
-    const overlay = document.getElementById('bj-result-overlay');
-    const titleEl = document.getElementById('bj-result-title');
-    const profitEl = document.getElementById('bj-result-profit');
-    const listEl  = document.getElementById('bj-result-list');
+    // Status line
     const isWin = profit > 0, isLoss = profit < 0;
-    titleEl.textContent = isWin ? '🎉 HAI VINTO!' : isLoss ? '😞 HAI PERSO' : '🤝 PAREGGIO';
-    titleEl.style.color = isWin ? '#4ade80' : isLoss ? '#f87171' : '#facc15';
-    profitEl.textContent = (profit > 0 ? '+' : '') + profit + '€  •  Saldo: ' + newBalance.toFixed(2) + '€';
-    profitEl.style.color = isWin ? '#4ade80' : isLoss ? '#f87171' : '#facc15';
-    listEl.innerHTML = results.map(r => `${r.icon} ${r.label} <strong>${r.profit > 0 ? '+' : ''}${r.profit}€</strong>`).join('<br>');
-    const btnsEl = overlay.querySelector('.bj-result-btns');
-    if (btnsEl) {
-      if (newBalance < 1) {
-        btnsEl.innerHTML = `<button class="bj-btn" style="background:#b5a06e;color:#000;font-weight:800" onclick="bjRefill()">🪙 Riprendi 5€ gratis</button><button class="bj-btn" onclick="closeBJ()">🏠 Lobby</button>`;
-      } else {
-        btnsEl.innerHTML = `<button class="bj-btn primary" onclick="bjPlayAgain()">🔄 Ancora</button><button class="bj-btn" onclick="closeBJ()">🏠 Lobby</button>`;
-      }
-    }
-    overlay.style.display = 'flex';
-  }
+    const sign = profit > 0 ? '+' : '';
+    const statusEl = document.getElementById('bj-status');
+    statusEl.textContent = `${sign}${profit.toFixed(2)}€  •  Saldo: ${newBalance.toFixed(2)}€`;
+    statusEl.style.color = isWin ? '#4ade80' : isLoss ? '#f87171' : '#fb923c';
 
-  function bjPlayAgain() { _bjReset(); }
+    // If broke, show refill immediately
+    if (newBalance < 1) {
+      document.getElementById('bj-bet-panel').style.display = 'block';
+      document.getElementById('bj-action-panel').style.display = 'none';
+      document.getElementById('bj-deal-btn').disabled = true;
+      statusEl.textContent += '  —  ';
+      const refillBtn = document.createElement('button');
+      refillBtn.className = 'bj-btn primary';
+      refillBtn.style.cssText = 'background:#b5a06e;border-color:#b5a06e;color:#000;margin-top:.4rem;width:100%';
+      refillBtn.textContent = '🪙 Riprendi 5€ gratis';
+      refillBtn.onclick = bjRefill;
+      statusEl.after(refillBtn);
+      return;
+    }
+
+    // Auto-reset after 2s so player can bet again
+    setTimeout(() => _bjReset(), 2000);
+  }
 
   function bjRefill() {
     const fresh = { balance: 5, totalWagered: 0, totalWon: 0, totalLost: 0, gamesPlayed: 0, streak: 0 };
     _saveStats(fresh); _casinoBal = 5;
     _updateTopbar({ eur: 5, gamesPlayed: 0, totalWon: 0, totalLost: 0, streak: 0 });
     _bjReset();
-    document.getElementById('bj-result-overlay').style.display = 'none';
+    document.getElementById('bj-status').textContent = '';
   }
 
   function _updateTopbarBal() {
