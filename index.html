@@ -1002,8 +1002,7 @@
       font-size: .65rem; font-weight: 700; color: var(--muted); letter-spacing: .5px;
     }
 
-    /* Blackjack game view */
-    #casino-bj-view { display: none; }
+    /* Blackjack game view — shown/hidden via JS inline style */
     .bj-back-btn {
       background: none; border: 1px solid var(--border); color: var(--muted);
       border-radius: 8px; padding: .4rem .9rem; cursor: pointer; font-size: .85rem;
@@ -1597,7 +1596,7 @@
           <div class="bj-result-title" id="bj-result-title">—</div>
           <div class="bj-result-profit" id="bj-result-profit"></div>
           <div class="bj-result-list" id="bj-result-list"></div>
-          <div style="display:flex;gap:.75rem;margin-top:.5rem">
+          <div class="bj-result-btns" style="display:flex;gap:.75rem;margin-top:.5rem;flex-wrap:wrap;justify-content:center">
             <button class="bj-btn primary" onclick="bjPlayAgain()">🔄 Ancora</button>
             <button class="bj-btn" onclick="closeBJ()">🏠 Lobby</button>
           </div>
@@ -2027,8 +2026,10 @@
 
   function openBJ() {
     document.getElementById('casino-lobby-view').style.display = 'none';
-    document.getElementById('casino-bj-view').style.display = '';
+    document.getElementById('casino-bj-view').style.display = 'block';
     _bjReset();
+    // scroll to casino section
+    document.getElementById('casino').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function closeBJ() { _showLobby(null); }
@@ -2040,11 +2041,11 @@
     document.getElementById('dealer-val').textContent = '?';
     document.getElementById('bj-result-overlay').style.display = 'none';
     document.getElementById('bj-insurance-prompt').style.display = 'none';
-    document.getElementById('bj-bet-panel').style.display = '';
+    document.getElementById('bj-bet-panel').style.display = 'flex';
     document.getElementById('bj-action-panel').style.display = 'none';
     document.getElementById('bj-status').textContent = '';
     document.getElementById('bj-deal-btn').disabled = false;
-    // restore chip selection
+    // pre-select chip matching current bet
     document.querySelectorAll('.bet-chip').forEach(b => b.classList.toggle('bet-selected', parseInt(b.dataset.amt) === _bjBet));
   }
 
@@ -2174,13 +2175,13 @@
       if (data.needsInsurance) {
         const maxIns = Math.floor(bet / 2);
         document.getElementById('bj-ins-yes-btn').textContent = `✅ Sì (${maxIns}€)`;
-        document.getElementById('bj-insurance-prompt').style.display = '';
+        document.getElementById('bj-insurance-prompt').style.display = 'block';
         document.getElementById('bj-action-panel').style.display = 'none';
         _bjLocked = false;
         return;
       }
 
-      document.getElementById('bj-action-panel').style.display = '';
+      document.getElementById('bj-action-panel').style.display = 'flex';
       _updateBJDisplay(data.game, false);
       _bjLocked = false;
 
@@ -2232,7 +2233,7 @@
       _casinoBal = data.balance; _updateTopbarBal();
       _bjGame = data.game;
       _updateBJDisplay(data.game, false);
-      document.getElementById('bj-action-panel').style.display = '';
+      document.getElementById('bj-action-panel').style.display = 'flex';
     } catch { document.getElementById('bj-status').textContent = '❌ Errore di rete.'; }
     _bjLocked = false;
   }
@@ -2249,22 +2250,21 @@
         signal: AbortSignal.timeout(8000),
       });
       const data = await r.json();
-      if (!r.ok) { document.getElementById('bj-status').textContent = '❌ ' + (data.error||'Errore'); _bjLocked = false; document.getElementById('bj-action-panel').style.display = ''; return; }
+      if (!r.ok) { document.getElementById('bj-status').textContent = '❌ ' + (data.error||'Errore'); _bjLocked = false; document.getElementById('bj-action-panel').style.display = 'flex'; return; }
       _casinoBal = data.balance; _updateTopbarBal();
       _bjGame = data.game;
       document.getElementById('bj-status').textContent = '';
 
       if (data.game.phase === 'result') {
-        // Show dealer drawing animation
         document.getElementById('bj-status').textContent = '🎰 Il dealer pesca...';
         await new Promise(r => setTimeout(r, 700));
         _updateBJDisplay(data.game, true);
         _showResult(data.results, data.profit, data.balance);
       } else {
         _updateBJDisplay(data.game, false);
-        document.getElementById('bj-action-panel').style.display = '';
+        document.getElementById('bj-action-panel').style.display = 'flex';
       }
-    } catch { document.getElementById('bj-status').textContent = '❌ Errore di rete.'; document.getElementById('bj-action-panel').style.display = ''; }
+    } catch { document.getElementById('bj-status').textContent = '❌ Errore di rete.'; document.getElementById('bj-action-panel').style.display = 'flex'; }
     _bjLocked = false;
   }
 
@@ -2275,21 +2275,37 @@
     const profitEl = document.getElementById('bj-result-profit');
     const listEl  = document.getElementById('bj-result-list');
 
-    const isWin  = profit > 0;
+    const isWin = profit > 0;
     const isLoss = profit < 0;
-    const isTie  = profit === 0;
 
     titleEl.textContent = isWin ? '🎉 HAI VINTO!' : isLoss ? '😞 HAI PERSO' : '🤝 PAREGGIO';
     titleEl.style.color = isWin ? '#4ade80' : isLoss ? '#f87171' : '#facc15';
-    profitEl.textContent = (profit > 0 ? '+' : '') + profit + '€';
+    profitEl.textContent = (profit > 0 ? '+' : '') + profit + '€  •  Saldo: ' + newBalance.toFixed(2) + '€';
     profitEl.style.color = isWin ? '#4ade80' : isLoss ? '#f87171' : '#facc15';
     listEl.innerHTML = results.map(r => `${r.icon} ${r.label} <strong>${r.profit > 0 ? '+' : ''}${r.profit}€</strong>`).join('<br>');
 
+    // Show refill button if broke
+    const btnsEl = overlay.querySelector('.bj-result-btns');
+    if (btnsEl) {
+      if (newBalance < 1) {
+        btnsEl.innerHTML = `<button class="bj-btn" style="background:#b5a06e;color:#000;font-weight:800" onclick="bjRefill()">🪙 Riprendi 5€ gratis</button><button class="bj-btn" onclick="closeBJ()">🏠 Lobby</button>`;
+      } else {
+        btnsEl.innerHTML = `<button class="bj-btn primary" onclick="bjPlayAgain()">🔄 Ancora</button><button class="bj-btn" onclick="closeBJ()">🏠 Lobby</button>`;
+      }
+    }
     overlay.style.display = 'flex';
   }
 
-  function bjPlayAgain() {
+  function bjPlayAgain() { _bjReset(); }
+
+  async function bjRefill() {
+    // Reset session for a fresh 5€
+    const sid = _genSessionId();
+    localStorage.setItem('casino_sessionId', sid);
+    _casinoUserId = sid;
+    try { const r = await fetch(`${CASINO_API}/api/casino/balance/${sid}`,{signal:AbortSignal.timeout(5000)}); const d = await r.json(); _updateTopbar(d); } catch {}
     _bjReset();
+    document.getElementById('bj-result-overlay').style.display = 'none';
   }
 
   function _updateTopbarBal() {
