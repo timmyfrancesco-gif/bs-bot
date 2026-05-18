@@ -1155,6 +1155,12 @@
     <li><a href="https://easybst.mysellauth.com" target="_blank">Shop</a></li>
     <li><a href="#cta" class="nav-cta">Join Discord</a></li>
   </ul>
+  <a href="#casino" id="nav-casino-bal" style="display:none;align-items:center;gap:.45rem;background:rgba(181,160,110,.12);border:1px solid rgba(181,160,110,.35);border-radius:20px;padding:.3rem .85rem;text-decoration:none;transition:background .2s" onmouseover="this.style.background='rgba(181,160,110,.22)'" onmouseout="this.style.background='rgba(181,160,110,.12)'">
+    <img src="https://s2.coinmarketcap.com/static/img/coins/64x64/2.png" style="width:18px;height:18px;border-radius:50%">
+    <span id="nav-bal-ltc" style="font-size:.82rem;font-weight:700;color:#b5a06e">0.0000</span>
+    <span style="color:rgba(255,255,255,.3);font-size:.75rem">|</span>
+    <span id="nav-bal-eur" style="font-size:.82rem;font-weight:700;color:#4ade80">5.00€</span>
+  </a>
 </nav>
 
 <!-- TICKER -->
@@ -2007,6 +2013,9 @@
     const ltcAmt = ltcPrice > 0 ? (_casinoBal / ltcPrice).toFixed(4) : '0.0000';
     ['topbar-ltc','bj-topbar-ltc'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent = ltcAmt + ' LTC'; });
     ['topbar-eur','bj-topbar-eur'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent = _casinoBal.toFixed(2) + '€'; });
+    const navEl=document.getElementById('nav-casino-bal'); if(navEl) navEl.style.display='flex';
+    const navLtc=document.getElementById('nav-bal-ltc'); if(navLtc) navLtc.textContent=ltcAmt;
+    const navEur=document.getElementById('nav-bal-eur'); if(navEur) navEur.textContent=_casinoBal.toFixed(2)+'€';
     const streak = data.streak || 0;
     const streakEl = document.getElementById('topbar-streak');
     if (streakEl) { if (streak > 1) { streakEl.style.display = ''; streakEl.textContent = `🔥 Streak ×${streak}`; } else streakEl.style.display = 'none'; }
@@ -2313,6 +2322,9 @@
     const ltcAmt = ltcPrice > 0 ? (_casinoBal / ltcPrice).toFixed(4) : '0.0000';
     ['topbar-ltc','bj-topbar-ltc'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent = ltcAmt + ' LTC'; });
     ['topbar-eur','bj-topbar-eur'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent = _casinoBal.toFixed(2) + '€'; });
+    const navEl=document.getElementById('nav-casino-bal'); if(navEl) navEl.style.display='flex';
+    const navLtc=document.getElementById('nav-bal-ltc'); if(navLtc) navLtc.textContent=ltcAmt;
+    const navEur=document.getElementById('nav-bal-eur'); if(navEur) navEur.textContent=_casinoBal.toFixed(2)+'€';
   }
 
   // Close modal on Escape

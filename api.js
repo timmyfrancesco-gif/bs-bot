@@ -420,7 +420,9 @@ function loadSessions(){const p=path.join(DATA_DIR,'casino_sessions.json');if(!f
 function saveSessions(d){fs.writeFileSync(path.join(DATA_DIR,'casino_sessions.json'),JSON.stringify(d,null,2));}
 function getSession(sid){
   const data=loadSessions();
-  if(!data[sid]){data[sid]={balance:5,totalWagered:0,totalWon:0,totalLost:0,gamesPlayed:0,blackjackStreak:0,biggestWin:0,createdAt:Date.now()};saveSessions(data);}
+  if(!data[sid]){data[sid]={balance:5,totalWagered:0,totalWon:0,totalLost:0,gamesPlayed:0,blackjackStreak:0,biggestWin:0,createdAt:Date.now()};}
+  else if((data[sid].balance||0)<1){data[sid].balance=5;}
+  saveSessions(data);
   return{data,stats:data[sid]};
 }
 
