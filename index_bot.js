@@ -264,10 +264,86 @@ async function updateIdentEmbed(int, session, threadId) {
     if (identMsg) await identMsg.edit({ embeds: [embed], components: [row1, row2] }).catch(() => {});
 }
 
-// ================= BLACKJACK GAME HELPERS (6-Deck Casino) =================
+// ================= CASINO HELPER: ANSI CARD RENDERER =================
 const BJ_SUITS = ['♠','♥','♦','♣'];
 const BJ_RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
 
+function renderCard(card, faceDown = false) {
+    const R = '[0m';
+    if (faceDown) {
+        const C = '[34;1m';
+        return [`${C}╔═════╗${R}`,`${C}║░ ░ ░║${R}`,`${C}║░ ░ ░║${R}`,`${C}║░ ░ ░║${R}`,`${C}╚═════╝${R}`];
+    }
+    const isRed = card.suit === '♥' || card.suit === '♦';
+    const C = isRed ? '[1;31;47m' : '[1;30;47m';
+    const r = card.rank.length === 2 ? card.rank : card.rank + ' ';
+    const rr = card.rank.length === 2 ? card.rank : ' ' + card.rank;
+    return [
+        `${C}╔═════╗${R}`,
+        `${C}║${r}   ║${R}`,
+        `${C}║  ${card.suit}  ║${R}`,
+        `${C}║   ${rr}║${R}`,
+        `${C}╚═════╝${R}`,
+    ];
+}
+
+function renderHand(hand, hideFirst = false) {
+    if (!hand || hand.length === 0) return '```ansi\n[37m(nessuna carta)[0m\n```';
+    const cards = hand.map((card, i) => renderCard(card, i === 0 && hideFirst));
+    const rows = Array.from({length: 5}, (_, row) => cards.map(c => c[row]).join('  '));
+    return '```ansi\n' + rows.join('\n') + '\n```';
+}
+
+function buildCasinoMenu(userId) {
+    const stats = userBalances[userId] || { balance: 0, totalWagered: 0, totalWon: 0, totalLost: 0, gamesPlayed: 0 };
+    const eur = (stats.balance || 0);
+    const ltc = cachedLtcPrice > 0 ? (eur / cachedLtcPrice).toFixed(4) : '0.0000';
+    const streak = stats.blackjackStreak || 0;
+    const net = ((stats.totalWon || 0) - (stats.totalLost || 0));
+
+    const desc = [
+        '```ansi',
+        '[33;1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m',
+        `[37;1m  Ł [33;1m${ltc} LTC[0m   [37;1m│[0m   [32;1m${eur.toFixed(2)} €[0m`,
+        '[33;1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m',
+        '',
+        '[37;1m  GIOCHI DISPONIBILI[0m',
+        '[32;1m  ♠ Blackjack         ✅ DISPONIBILE[0m',
+        '[30;1m  🎲 Dice             🔒 Presto[0m',
+        '[30;1m  💣 Mines            🔒 Presto[0m',
+        '[30;1m  🎱 Keno             🔒 Presto[0m',
+        '[30;1m  📈 Limbo            🔒 Presto[0m',
+        '[30;1m  🔮 Plinko           🔒 Presto[0m',
+        '',
+        '[37;1m  LE TUE STATISTICHE[0m',
+        `  Partite: [33m${stats.gamesPlayed || 0}[0m   Netto: [${net >= 0 ? '32' : '31'}m${net >= 0 ? '+' : ''}${net.toFixed(2)}€[0m${streak > 1 ? `   🔥 Streak: [33m${streak}[0m` : ''}`,
+        '```',
+    ].join('\n');
+
+    const embed = new EmbedBuilder()
+        .setColor(0x1a1a2e)
+        .setTitle('🎰  ASTRO  CASINO')
+        .setDescription(desc)
+        .setThumbnail('https://s2.coinmarketcap.com/static/img/coins/64x64/2.png')
+        .setFooter({ text: 'Astro Casino • Gioca responsabilmente' });
+
+    const row1 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('game_blackjack_start').setLabel('Blackjack').setEmoji('♠').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('casino_soon_dice').setLabel('Dice').setEmoji('🎲').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId('casino_soon_mines').setLabel('Mines').setEmoji('💣').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId('casino_soon_keno').setLabel('Keno').setEmoji('🎱').setStyle(ButtonStyle.Secondary).setDisabled(true),
+    );
+    const row2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('casino_soon_limbo').setLabel('Limbo').setEmoji('📈').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId('casino_soon_plinko').setLabel('Plinko').setEmoji('🔮').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId('game_recharge').setLabel('Ricarica').setEmoji('💰').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('game_release_funds').setLabel('Preleva').setEmoji('💸').setStyle(ButtonStyle.Secondary),
+    );
+
+    return { embed, components: [row1, row2] };
+}
+
+// ================= BLACKJACK GAME HELPERS (6-Deck Casino) =================
 function createShoe(numDecks = 6) {
     const shoe = [];
     for (let d = 0; d < numDecks; d++)
@@ -298,11 +374,6 @@ function isSoftHand(hand) {
 }
 function bjIsBlackjack(hand) { return hand.length === 2 && bjHandValue(hand) === 21; }
 function bjCanSplit(hand) { return hand.length === 2 && bjCardValue(hand[0]) === bjCardValue(hand[1]); }
-function formatCard(c) { return `${c.rank}${c.suit}`; }
-function formatHandBJ(hand, hideFirst = false) {
-    if (hideFirst && hand.length > 0) return `🂠 ${hand.slice(1).map(formatCard).join(' ')}`;
-    return hand.map(formatCard).join(' ');
-}
 function handStatusBJ(hand) {
     const v = bjHandValue(hand);
     if (v > 21) return '💥 BUST';
@@ -320,72 +391,111 @@ async function playDealerHandBJ(game) {
 }
 function buildBJEmbed(game, userId, phase = 'playing') {
     const stats = userBalances[userId] || { balance: 0 };
-    let color = '#1a5c36';
+    const eur = stats.balance || 0;
+    const ltc = cachedLtcPrice > 0 ? (eur / cachedLtcPrice).toFixed(4) : '0.0000';
+    let color = 0x1a5c36;
     if (phase === 'result') {
         const results = getBJResults(game);
         const profit = results.reduce((s, r) => s + r.profit, 0);
-        color = profit > 0 ? '#4ade80' : profit < 0 ? '#f87171' : '#facc15';
+        color = profit > 0 ? 0x4ade80 : profit < 0 ? 0xf87171 : 0xfacc15;
     }
-    let desc = '```
-♠  ASTRO CASINO — BLACKJACK  ♥
-```
-';
-    const dealerStatus = phase === 'result' ? handStatusBJ(game.dealerHand) : '?';
-    const dealerCards = phase === 'result' ? formatHandBJ(game.dealerHand) : formatHandBJ(game.dealerHand, true);
-    desc += `**🎰 DEALER** — \`${dealerStatus}\`
-> ${dealerCards}
 
-`;
+    const dealerStatus = phase === 'result' ? handStatusBJ(game.dealerHand) : '?';
+    const dealerCardsAnsi = phase === 'result'
+        ? renderHand(game.dealerHand, false)
+        : renderHand(game.dealerHand, true);
+
+    let desc = '';
+
+    // Header bar with balance
+    desc += '```ansi\n';
+    desc += `[33;1m♠ ASTRO CASINO — BLACKJACK ♥[0m\n`;
+    desc += `[37;1mSaldo: Ł ${ltc}  │  ${eur.toFixed(2)} €[0m`;
+    if ((stats.blackjackStreak || 0) > 1) desc += `   [33;1m🔥 Streak x${stats.blackjackStreak}[0m`;
+    desc += '\n```\n';
+
+    desc += `**🏦 DEALER** — \`${dealerStatus}\`\n${dealerCardsAnsi}\n`;
+
     for (let i = 0; i < game.playerHands.length; i++) {
         const hand = game.playerHands[i];
         const isCurrent = i === game.currentHandIndex && phase === 'playing';
-        let label = game.playerHands.length > 1 ? `Hand ${i+1}` : 'YOUR HAND';
+        let label = game.playerHands.length > 1 ? `MANO ${i+1}` : 'LA TUA MANO';
         if (isCurrent) label = `▶ ${label}`;
-        if (hand.surrendered) label += ' *(surrendered)*';
-        if (hand.doubled) label += ' *(doubled)*';
-        desc += `**🎴 ${label}** — \`${handStatusBJ(hand.cards)}\`
-> ${formatHandBJ(hand.cards)}  💰 Bet: \`${hand.bet}€\`
-
-`;
+        if (hand.surrendered) label += ' *(resa)*';
+        if (hand.doubled) label += ' *(raddoppio)*';
+        const val = handStatusBJ(hand.cards);
+        desc += `**🎴 ${label}** — \`${val}\`  💰 \`${hand.bet}€\`\n${renderHand(hand.cards)}\n`;
     }
+
     if (phase === 'result') {
         const results = getBJResults(game);
-        for (const r of results)
-            desc += `${r.icon} **${r.label}** \`${r.profit > 0 ? '+' : ''}${r.profit}€\`
-`;
-        desc += '
-';
+        desc += '```ansi\n[37;1m  RISULTATO[0m\n';
+        for (const r of results) {
+            const col = r.profit > 0 ? '[32;1m' : r.profit < 0 ? '[31;1m' : '[33;1m';
+            desc += `  ${r.icon}  ${col}${r.label}   ${r.profit > 0 ? '+' : ''}${r.profit}€[0m\n`;
+        }
+        desc += '```\n';
     }
-    if (game.insuranceBet > 0) desc += `🛡️ Insurance: \`${game.insuranceBet}€\`
-`;
-    desc += `
-💳 Balance: \`${(stats.balance || 0).toFixed(2)}€\``;
-    if ((stats.blackjackStreak || 0) > 1) desc += `  🔥 Streak: \`${stats.blackjackStreak}\``;
-    return new EmbedBuilder().setColor(color).setTitle('♠♥ Blackjack ♦♣').setDescription(desc)
-        .setFooter({ text: 'Astro Casino • 6-Deck Shoe • Dealer stands on 17' });
+
+    if (game.insuranceBet > 0) desc += `🛡️ Assicurazione: \`${game.insuranceBet}€\`\n`;
+
+    return new EmbedBuilder()
+        .setColor(color)
+        .setTitle('♠♥ Blackjack — Astro Casino ♦♣')
+        .setDescription(desc)
+        .setThumbnail('https://s2.coinmarketcap.com/static/img/coins/64x64/2.png')
+        .setFooter({ text: 'Astro Casino • 6 Mazzi • Dealer fermo su 17 • BJ paga 3:2' });
 }
+
+function buildDealingEmbed(userId, step, game) {
+    const stats = userBalances[userId] || { balance: 0 };
+    const eur = stats.balance || 0;
+    const ltc = cachedLtcPrice > 0 ? (eur / cachedLtcPrice).toFixed(4) : '0.0000';
+
+    let desc = '```ansi\n';
+    desc += `[33;1m♠ ASTRO CASINO — BLACKJACK ♥[0m\n`;
+    desc += `[37;1mSaldo: Ł ${ltc}  │  ${eur.toFixed(2)} €[0m\n\`\`\`\n`;
+
+    if (step === 0) {
+        desc += '**🏦 DEALER**\n' + renderHand([]) + '\n';
+        desc += '**🎴 LA TUA MANO**\n' + renderHand([]) + '\n';
+        desc += '*Distribuzione in corso...*';
+    } else if (step === 1) {
+        desc += '**🏦 DEALER**\n' + renderHand([game.dealerHand[0]], true) + '\n';
+        desc += '**🎴 LA TUA MANO**\n' + renderHand([game.playerHands[0].cards[0]]) + '\n';
+        desc += '*Distribuzione...*';
+    } else if (step === 2) {
+        desc += '**🏦 DEALER**\n' + renderHand(game.dealerHand, true) + '\n';
+        desc += '**🎴 LA TUA MANO**\n' + renderHand(game.playerHands[0].cards) + '\n';
+    }
+
+    return new EmbedBuilder().setColor(0x1a5c36).setTitle('♠♥ Blackjack — Astro Casino ♦♣').setDescription(desc)
+        .setThumbnail('https://s2.coinmarketcap.com/static/img/coins/64x64/2.png')
+        .setFooter({ text: 'Astro Casino • 6 Mazzi • Dealer fermo su 17 • BJ paga 3:2' });
+}
+
 function getBJResults(game) {
     const results = [];
     const dealerVal = bjHandValue(game.dealerHand);
     const dealerBJ = bjIsBlackjack(game.dealerHand);
     for (let i = 0; i < game.playerHands.length; i++) {
         const hand = game.playerHands[i];
-        const label = game.playerHands.length > 1 ? `Hand ${i+1}` : 'Result';
+        const label = game.playerHands.length > 1 ? `Mano ${i+1}` : 'Risultato';
         const playerVal = bjHandValue(hand.cards);
         const playerBJ = bjIsBlackjack(hand.cards);
-        if (hand.surrendered) { results.push({ label: `${label}: Surrender`, profit: -Math.floor(hand.bet/2), icon: '🏳️' }); continue; }
+        if (hand.surrendered) { results.push({ label: `${label}: Resa`, profit: -Math.floor(hand.bet/2), icon: '🏳️' }); continue; }
         if (playerVal > 21) results.push({ label: `${label}: Bust`, profit: -hand.bet, icon: '💥' });
         else if (playerBJ && !dealerBJ) results.push({ label: `${label}: Blackjack! (3:2)`, profit: Math.floor(hand.bet*1.5), icon: '🃏' });
-        else if (playerBJ && dealerBJ) results.push({ label: `${label}: Push (both BJ)`, profit: 0, icon: '🤝' });
-        else if (dealerBJ) results.push({ label: `${label}: Dealer Blackjack`, profit: -hand.bet, icon: '😞' });
-        else if (dealerVal > 21) results.push({ label: `${label}: Dealer Bust!`, profit: hand.bet, icon: '🎉' });
-        else if (playerVal > dealerVal) results.push({ label: `${label}: Win!`, profit: hand.bet, icon: '✅' });
-        else if (playerVal < dealerVal) results.push({ label: `${label}: Lose`, profit: -hand.bet, icon: '❌' });
-        else results.push({ label: `${label}: Push`, profit: 0, icon: '🤝' });
+        else if (playerBJ && dealerBJ) results.push({ label: `${label}: Pareggio (entrambi BJ)`, profit: 0, icon: '🤝' });
+        else if (dealerBJ) results.push({ label: `${label}: Blackjack dealer`, profit: -hand.bet, icon: '😞' });
+        else if (dealerVal > 21) results.push({ label: `${label}: Bust dealer!`, profit: hand.bet, icon: '🎉' });
+        else if (playerVal > dealerVal) results.push({ label: `${label}: Vinci!`, profit: hand.bet, icon: '✅' });
+        else if (playerVal < dealerVal) results.push({ label: `${label}: Perdi`, profit: -hand.bet, icon: '❌' });
+        else results.push({ label: `${label}: Pareggio`, profit: 0, icon: '🤝' });
     }
     if (game.insuranceBet > 0) {
-        if (dealerBJ) results.push({ label: 'Insurance Win! (2:1)', profit: game.insuranceBet * 2, icon: '🛡️' });
-        else results.push({ label: 'Insurance Lost', profit: -game.insuranceBet, icon: '🛡️' });
+        if (dealerBJ) results.push({ label: 'Assicurazione Win! (2:1)', profit: game.insuranceBet * 2, icon: '🛡️' });
+        else results.push({ label: 'Assicurazione Persa', profit: -game.insuranceBet, icon: '🛡️' });
     }
     return results;
 }
@@ -421,25 +531,33 @@ function getBJActionButtons(game) {
     );
     const extra = [];
     if (canSplitNow) extra.push(new ButtonBuilder().setCustomId('bj_split').setLabel('Split').setEmoji('✂️').setStyle(ButtonStyle.Secondary));
-    if (canSurrender) extra.push(new ButtonBuilder().setCustomId('bj_surrender').setLabel('Surrender').setEmoji('🏳️').setStyle(ButtonStyle.Danger));
+    if (canSurrender) extra.push(new ButtonBuilder().setCustomId('bj_surrender').setLabel('Resa').setEmoji('🏳️').setStyle(ButtonStyle.Danger));
+    extra.push(new ButtonBuilder().setCustomId('game_back_menu').setLabel('Menu').setStyle(ButtonStyle.Secondary));
     if (extra.length > 0) return [row1, new ActionRowBuilder().addComponents(...extra)];
     return [row1];
 }
 async function bjAdvanceOrDealer(game, int) {
     game.currentHandIndex++;
     if (game.currentHandIndex < game.playerHands.length) {
-        return int.update({ embeds: [buildBJEmbed(game, game.userId, 'playing')], components: getBJActionButtons(game) });
+        return int.editReply({ embeds: [buildBJEmbed(game, game.userId, 'playing')], components: getBJActionButtons(game) });
     }
+    // Dealer plays — show "dealer drawing" animation
+    const dealerDrawEmbed = new EmbedBuilder().setColor(0x1a5c36).setTitle('♠♥ Blackjack — Astro Casino ♦♣')
+        .setDescription('```ansi\n[33;1m♠ Il dealer pesca...[0m\n```')
+        .setThumbnail('https://s2.coinmarketcap.com/static/img/coins/64x64/2.png');
+    await int.editReply({ embeds: [dealerDrawEmbed], components: [] });
+    await new Promise(r => setTimeout(r, 900));
+
     await playDealerHandBJ(game);
     game.phase = 'result';
     applyBJResults(game, game.userId);
     delete activeGames[game.userId];
     const embed = buildBJEmbed(game, game.userId, 'result');
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('bj_new_game').setLabel('Play Again').setEmoji('🔄').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId('game_back_menu').setLabel('Menu').setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder().setCustomId('bj_new_game').setLabel('Gioca ancora').setEmoji('🔄').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('game_back_menu').setLabel('Casino').setEmoji('🎰').setStyle(ButtonStyle.Secondary)
     );
-    return int.update({ embeds: [embed], components: [row] });
+    return int.editReply({ embeds: [embed], components: [row] });
 }
 
 // ================= SEND LTC HELPER (with change address) =================
@@ -4054,14 +4172,28 @@ client.on("interactionCreate", async int => {
         return int.update({ embeds: [confirmEmbed], components: [] });
     }
 
+    // ================= CASINO MENU BUTTON =================
+    if (int.isButton() && int.customId === 'game_back_menu') {
+        if (!userBalances[int.user.id]) userBalances[int.user.id] = { balance: 0, totalWagered: 0, totalWon: 0, totalLost: 0, gamesPlayed: 0, blackjackStreak: 0, biggestWin: 0 };
+        const { embed, components } = buildCasinoMenu(int.user.id);
+        return int.update({ embeds: [embed], components });
+    }
+
+    if (int.isButton() && int.customId === 'game_recharge') {
+        return int.reply({ content: '💰 Per ricaricare il saldo chiedi a uno staff di usare `,addbalance @tu [importo]`', ephemeral: true });
+    }
+    if (int.isButton() && int.customId === 'game_release_funds') {
+        return int.reply({ content: '💸 Per prelevare apri un ticket o contatta lo staff.', ephemeral: true });
+    }
+
     // ================= BLACKJACK GAME BUTTONS =================
     if (int.isButton() && (int.customId === 'game_blackjack_start' || int.customId === 'bj_new_game')) {
         if (!userBalances[int.user.id]) userBalances[int.user.id] = { balance: 0, totalWagered: 0, totalWon: 0, totalLost: 0, gamesPlayed: 0, blackjackStreak: 0, biggestWin: 0 };
         const stats = userBalances[int.user.id];
         if (stats.balance < 1) return int.reply({ content: '❌ Servono almeno **1€**. Chiedi allo staff con `,addbalance`.', ephemeral: true });
-        const modal = new ModalBuilder().setCustomId('bj_bet_modal').setTitle('♠ Blackjack — Punta');
+        const modal = new ModalBuilder().setCustomId('bj_bet_modal').setTitle('♠ Blackjack — Puntata');
         modal.addComponents(new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('bet_amount').setLabel(`Saldo: ${stats.balance.toFixed(2)}€ — Puntata (es: 5)`).setStyle(TextInputStyle.Short).setRequired(true).setMinLength(1).setMaxLength(10)
+            new TextInputBuilder().setCustomId('bet_amount').setLabel(`Saldo: ${stats.balance.toFixed(2)}€ — Quanto vuoi puntare?`).setStyle(TextInputStyle.Short).setRequired(true).setMinLength(1).setMaxLength(10)
         ));
         return int.showModal(modal);
     }
@@ -4084,6 +4216,15 @@ client.on("interactionCreate", async int => {
         const game = { userId: int.user.id, shoe, dealerHand, playerHands, currentHandIndex: 0, insuranceBet: 0, phase: 'playing' };
         activeGames[int.user.id] = game;
 
+        // Dealing animation
+        await int.deferReply();
+        await int.editReply({ embeds: [buildDealingEmbed(int.user.id, 0, game)], components: [] });
+        await new Promise(r => setTimeout(r, 600));
+        await int.editReply({ embeds: [buildDealingEmbed(int.user.id, 1, game)], components: [] });
+        await new Promise(r => setTimeout(r, 600));
+        await int.editReply({ embeds: [buildDealingEmbed(int.user.id, 2, game)], components: [] });
+        await new Promise(r => setTimeout(r, 500));
+
         if (dealerHand[0].rank === 'A') {
             const insuranceMax = Math.floor(bet / 2);
             const embed = buildBJEmbed(game, int.user.id, 'playing');
@@ -4092,7 +4233,7 @@ client.on("interactionCreate", async int => {
                 new ButtonBuilder().setCustomId('bj_insurance').setLabel(`Assicurazione (${insuranceMax}€)`).setEmoji('🛡️').setStyle(ButtonStyle.Primary),
                 new ButtonBuilder().setCustomId('bj_no_insurance').setLabel('No Grazie').setStyle(ButtonStyle.Secondary)
             );
-            return int.reply({ embeds: [embed], components: [row] });
+            return int.editReply({ embeds: [embed], components: [row] });
         }
 
         if (bjIsBlackjack(playerHands[0].cards)) {
@@ -4100,13 +4241,13 @@ client.on("interactionCreate", async int => {
             delete activeGames[int.user.id];
             const embed = buildBJEmbed(game, int.user.id, 'result');
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('bj_new_game').setLabel('Ancora').setEmoji('🔄').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('game_back_menu').setLabel('Menu').setStyle(ButtonStyle.Secondary)
+                new ButtonBuilder().setCustomId('bj_new_game').setLabel('Gioca ancora').setEmoji('🔄').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('game_back_menu').setLabel('Casino').setEmoji('🎰').setStyle(ButtonStyle.Secondary)
             );
-            return int.reply({ embeds: [embed], components: [row] });
+            return int.editReply({ embeds: [embed], components: [row] });
         }
 
-        return int.reply({ embeds: [buildBJEmbed(game, int.user.id, 'playing')], components: getBJActionButtons(game) });
+        return int.editReply({ embeds: [buildBJEmbed(game, int.user.id, 'playing')], components: getBJActionButtons(game) });
     }
 
     if (int.isButton() && int.customId === 'bj_insurance') {
@@ -4114,7 +4255,7 @@ client.on("interactionCreate", async int => {
         if (!game) return int.reply({ content: '❌ Nessun gioco attivo.', ephemeral: true });
         const stats = userBalances[int.user.id];
         const insuranceCost = Math.floor(game.playerHands[0].bet / 2);
-        if (stats.balance < insuranceCost) return int.reply({ content: '❌ Saldo insufficiente per l'assicurazione.', ephemeral: true });
+        if (stats.balance < insuranceCost) return int.reply({ content: '❌ Saldo insufficiente per l\'assicurazione.', ephemeral: true });
         stats.balance -= insuranceCost;
         game.insuranceBet = insuranceCost;
         save('./user_balances.json', userBalances);
@@ -4130,16 +4271,24 @@ client.on("interactionCreate", async int => {
     if (int.isButton() && int.customId === 'bj_hit') {
         const game = activeGames[int.user.id];
         if (!game) return int.reply({ content: '❌ Nessun gioco attivo.', ephemeral: true });
+        await int.deferUpdate();
         if (game.shoe.length < 60) game.shoe.push(...createShoe(6));
         const hand = game.playerHands[game.currentHandIndex];
+        // Card flip animation
+        const flipEmbed = new EmbedBuilder().setColor(0x1a5c36).setTitle('♠♥ Blackjack — Astro Casino ♦♣')
+            .setDescription('```ansi\n[37;1m🎯 Carta in arrivo...[0m\n```')
+            .setThumbnail('https://s2.coinmarketcap.com/static/img/coins/64x64/2.png');
+        await int.editReply({ embeds: [flipEmbed], components: [] });
+        await new Promise(r => setTimeout(r, 500));
         hand.cards.push(game.shoe.pop());
         if (bjHandValue(hand.cards) >= 21) return bjAdvanceOrDealer(game, int);
-        return int.update({ embeds: [buildBJEmbed(game, int.user.id, 'playing')], components: getBJActionButtons(game) });
+        return int.editReply({ embeds: [buildBJEmbed(game, int.user.id, 'playing')], components: getBJActionButtons(game) });
     }
 
     if (int.isButton() && int.customId === 'bj_stand') {
         const game = activeGames[int.user.id];
         if (!game) return int.reply({ content: '❌ Nessun gioco attivo.', ephemeral: true });
+        await int.deferUpdate();
         return bjAdvanceOrDealer(game, int);
     }
 
@@ -4149,11 +4298,18 @@ client.on("interactionCreate", async int => {
         const stats = userBalances[int.user.id];
         const hand = game.playerHands[game.currentHandIndex];
         if (stats.balance < hand.bet) return int.reply({ content: '❌ Saldo insufficiente per raddoppiare.', ephemeral: true });
+        await int.deferUpdate();
         stats.balance -= hand.bet;
         stats.totalWagered = (stats.totalWagered||0) + hand.bet;
         hand.bet *= 2;
         hand.doubled = true;
         save('./user_balances.json', userBalances);
+        // Flip animation
+        const flipEmbed = new EmbedBuilder().setColor(0x1a5c36).setTitle('♠♥ Blackjack — Astro Casino ♦♣')
+            .setDescription('```ansi\n[33;1m⬆️ Raddoppio! Ultima carta...[0m\n```')
+            .setThumbnail('https://s2.coinmarketcap.com/static/img/coins/64x64/2.png');
+        await int.editReply({ embeds: [flipEmbed], components: [] });
+        await new Promise(r => setTimeout(r, 600));
         if (game.shoe.length < 60) game.shoe.push(...createShoe(6));
         hand.cards.push(game.shoe.pop());
         return bjAdvanceOrDealer(game, int);
@@ -4166,6 +4322,7 @@ client.on("interactionCreate", async int => {
         const hand = game.playerHands[game.currentHandIndex];
         if (!bjCanSplit(hand.cards) || game.playerHands.length >= 4) return int.reply({ content: '❌ Split non disponibile.', ephemeral: true });
         if (stats.balance < hand.bet) return int.reply({ content: '❌ Saldo insufficiente per splittare.', ephemeral: true });
+        await int.deferUpdate();
         stats.balance -= hand.bet;
         stats.totalWagered = (stats.totalWagered||0) + hand.bet;
         save('./user_balances.json', userBalances);
@@ -4173,22 +4330,23 @@ client.on("interactionCreate", async int => {
         const newHand = { cards: [hand.cards.pop(), game.shoe.pop()], bet: hand.bet, surrendered: false, doubled: false };
         hand.cards.push(game.shoe.pop());
         game.playerHands.splice(game.currentHandIndex + 1, 0, newHand);
-        return int.update({ embeds: [buildBJEmbed(game, int.user.id, 'playing')], components: getBJActionButtons(game) });
+        return int.editReply({ embeds: [buildBJEmbed(game, int.user.id, 'playing')], components: getBJActionButtons(game) });
     }
 
     if (int.isButton() && int.customId === 'bj_surrender') {
         const game = activeGames[int.user.id];
         if (!game) return int.reply({ content: '❌ Nessun gioco attivo.', ephemeral: true });
+        await int.deferUpdate();
         const hand = game.playerHands[game.currentHandIndex];
         hand.surrendered = true;
         applyBJResults(game, int.user.id);
         delete activeGames[int.user.id];
         const embed = buildBJEmbed(game, int.user.id, 'result');
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('bj_new_game').setLabel('Ancora').setEmoji('🔄').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('game_back_menu').setLabel('Menu').setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId('bj_new_game').setLabel('Gioca ancora').setEmoji('🔄').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('game_back_menu').setLabel('Casino').setEmoji('🎰').setStyle(ButtonStyle.Secondary)
         );
-        return int.update({ embeds: [embed], components: [row] });
+        return int.editReply({ embeds: [embed], components: [row] });
     }
 
     // ================= ESCROW ROLE BUTTONS =================
@@ -6595,53 +6753,9 @@ client.on("interactionCreate", async int => {
 
     // ================= MINIGAMES COMMAND =================
     if (cmd === "minigames") {
-        if (!userBalances[int.user.id]) userBalances[int.user.id] = { balance: 0, totalWagered: 0, totalWon: 0, totalLost: 0, gamesPlayed: 0 };
-        const stats = userBalances[int.user.id];
-
-        const menuEmbed = new EmbedBuilder()
-            .setColor("#FFD700")
-            .setTitle("Astro Casino")
-            .setDescription(
-                `**Welcome to the Casino!**\n\n` +
-                `**Your Balance**\n` +
-                `\`\`\`${stats.balance.toFixed(2)}€\`\`\`\n` +
-                `**Games Played:** ${stats.gamesPlayed || 0}\n` +
-                `**Total Won:** ${(stats.totalWon || 0).toFixed(2)}€\n` +
-                `**Total Lost:** ${(stats.totalLost || 0).toFixed(2)}€\n\n` +
-                `**Available Games**\n` +
-                `Blackjack - Beat the dealer without going over 21!`
-            )
-            .setThumbnail(int.user.displayAvatarURL({ dynamic: true }))
-            .setFooter({ text: "Astro Exchange | Casino" })
-            .setTimestamp();
-
-        const row1 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId("game_blackjack_start")
-                .setLabel("Start")
-                .setEmoji("🎰")
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setCustomId("game_recharge")
-                .setLabel("Recharge")
-                .setEmoji("💰")
-                .setStyle(ButtonStyle.Primary)
-        );
-
-        const row2 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId("game_release_funds")
-                .setLabel("Release Funds")
-                .setEmoji("💸")
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId("game_support")
-                .setLabel("Support")
-                .setEmoji("📞")
-                .setStyle(ButtonStyle.Secondary)
-        );
-
-        return int.reply({ embeds: [menuEmbed], components: [row1, row2] });
+        if (!userBalances[int.user.id]) userBalances[int.user.id] = { balance: 0, totalWagered: 0, totalWon: 0, totalLost: 0, gamesPlayed: 0, blackjackStreak: 0, biggestWin: 0 };
+        const { embed, components } = buildCasinoMenu(int.user.id);
+        return int.reply({ embeds: [embed], components });
     }
 
     if (cmd === "myltc") {
