@@ -519,6 +519,37 @@ app.post('/api/casino/bj/action',(req,res)=>{
 });
 
 // ─────────────────────────────────────────────
+//  Prices proxy (avoids browser CORS/rate-limit on CoinGecko)
+// ─────────────────────────────────────────────
+let _priceCache = null;
+let _priceCacheTs = 0;
+app.get('/api/prices', async (req, res) => {
+  // Return cached prices if less than 60s old
+  if (_priceCache && Date.now() - _priceCacheTs < 60000) return res.json(_priceCache);
+  try {
+    const url = 'https://api.coingecko.com/api/v3/simple/price?ids=litecoin,bitcoin,ethereum,solana&vs_currencies=eur,usd';
+    const r = await new Promise((resolve, reject) => {
+      https.get(url, { headers: { 'Accept': 'application/json' } }, resp => {
+        let body = '';
+        resp.on('data', d => body += d);
+        resp.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+      }).on('error', reject);
+    });
+    // cache the LTC price for casino use too
+    const ltcEur = r.litecoin?.eur;
+    if (ltcEur) {
+      const cp = path.join(DATA_DIR, 'ltc_price_cache.json');
+      try { fs.writeFileSync(cp, JSON.stringify({ eur: ltcEur })); } catch {}
+    }
+    _priceCache = r; _priceCacheTs = Date.now();
+    res.json(r);
+  } catch(e) {
+    // Return stale cache or empty on failure
+    res.json(_priceCache || {});
+  }
+});
+
+// ─────────────────────────────────────────────
 //  Health check
 // ─────────────────────────────────────────────
 app.get("/api/health", (req, res) => res.json({ ok: true, ts: Date.now() }));

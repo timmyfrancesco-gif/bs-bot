@@ -1381,22 +1381,17 @@
     });
   }
 
-  // ── LIVE PRICES ──
+  // ── LIVE PRICES (proxied via Railway to avoid CoinGecko browser rate-limits) ──
   let _ltcEur = null;
+  const _PAPI = (window.ASTRO_API || '').replace(/\/$/, '');
 
   async function fetchPrices() {
     try {
-      const ids = 'litecoin,bitcoin,ethereum,solana';
-      const res  = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=eur,usd`);
+      const res  = await fetch(`${_PAPI}/api/prices`, { signal: AbortSignal.timeout(15000) });
       const data = await res.json();
       _ltcEur = data.litecoin?.eur || null;
-      const fmt = (n, prefix='€') => `${prefix}${n.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2})}`;
-      const prices = {
-        ltc: fmt(data.litecoin?.eur || 0),
-        btc: fmt(data.bitcoin?.eur || 0),
-        eth: fmt(data.ethereum?.eur || 0),
-        sol: fmt(data.solana?.eur || 0),
-      };
+      const fmt = (n) => `€${(n||0).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2})}`;
+      const prices = { ltc: fmt(data.litecoin?.eur), btc: fmt(data.bitcoin?.eur), eth: fmt(data.ethereum?.eur), sol: fmt(data.solana?.eur) };
       ['ltc','btc','eth','sol'].forEach(c => {
         document.getElementById(`${c}-price`).textContent  = prices[c];
         document.getElementById(`${c}-price2`).textContent = prices[c];
@@ -1409,7 +1404,8 @@
     }
   }
 
-  fetchPrices();
+  // Wake up Railway server then fetch prices
+  fetch(`${_PAPI}/api/health`, { signal: AbortSignal.timeout(25000) }).catch(() => {}).finally(() => fetchPrices());
   setInterval(fetchPrices, 60000);
 
   // ── LIVE FEED ──

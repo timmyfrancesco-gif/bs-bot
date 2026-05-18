@@ -491,13 +491,18 @@
 
   async function fetchPrices() {
     try {
-      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=litecoin&vs_currencies=eur');
+      const res = await fetch(`${CASINO_API}/api/prices`, { signal: AbortSignal.timeout(15000) });
       const data = await res.json();
       _ltcEur = data.litecoin?.eur || null;
       if (_ltcEur) _updateTopbarBal();
     } catch {}
   }
-  fetchPrices(); setInterval(fetchPrices, 60000);
+
+  // Wake up Railway on load, then fetch prices + init casino
+  fetch(`${CASINO_API}/api/health`, { signal: AbortSignal.timeout(25000) })
+    .catch(() => {})
+    .finally(() => { fetchPrices(); casinoInit(); });
+  setInterval(fetchPrices, 60000);
 
   function _genSessionId() {
     return 'web_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
@@ -507,12 +512,10 @@
     let sid = localStorage.getItem('casino_sessionId');
     if (!sid) { sid = _genSessionId(); localStorage.setItem('casino_sessionId', sid); }
     _casinoUserId = sid;
-    // Show nav chip immediately with default balance
     const navEl = document.getElementById('nav-casino-bal');
     if (navEl) navEl.style.display = 'flex';
     _showLobby();
   }
-  casinoInit();
 
   function casinoReset() {
     if (!confirm('Resettare la sessione? Il tuo saldo attuale andrà perso e riceverai 5€ nuovi.')) return;
@@ -541,7 +544,7 @@
 
   async function _showLobby(data) {
     if (!data) {
-      try { const r = await fetch(`${CASINO_API}/api/casino/balance/${_casinoUserId}`,{signal:AbortSignal.timeout(5000)}); data = await r.json(); } catch {}
+      try { const r = await fetch(`${CASINO_API}/api/casino/balance/${_casinoUserId}`,{signal:AbortSignal.timeout(20000)}); data = await r.json(); } catch {}
     }
     if (data) _updateTopbar(data);
     document.getElementById('casino-lobby-view').style.display = 'block';
@@ -670,7 +673,7 @@
       const r = await fetch(`${CASINO_API}/api/casino/bj/deal`, {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ userId: _casinoUserId, bet }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(20000),
       });
       const data = await r.json();
       if (!r.ok) { document.getElementById('bj-status').textContent = '❌ ' + (data.error || 'Errore'); _bjLocked = false; document.getElementById('bj-deal-btn').disabled = false; return; }
@@ -748,7 +751,7 @@
       const r = await fetch(`${CASINO_API}/api/casino/bj/action`, {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ userId: _casinoUserId, action: yes ? 'insurance' : 'no_insurance' }),
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(20000),
       });
       const data = await r.json();
       if (!r.ok) { document.getElementById('bj-status').textContent = '❌ ' + (data.error||'Errore'); _bjLocked = false; return; }
@@ -769,7 +772,7 @@
       const r = await fetch(`${CASINO_API}/api/casino/bj/action`, {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ userId: _casinoUserId, action }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(20000),
       });
       const data = await r.json();
       if (!r.ok) { document.getElementById('bj-status').textContent = '❌ ' + (data.error||'Errore'); _bjLocked = false; document.getElementById('bj-action-panel').style.display = 'flex'; return; }
@@ -825,7 +828,7 @@
     const sid = _genSessionId();
     localStorage.setItem('casino_sessionId', sid);
     _casinoUserId = sid;
-    try { const r = await fetch(`${CASINO_API}/api/casino/balance/${sid}`,{signal:AbortSignal.timeout(5000)}); const d = await r.json(); _updateTopbar(d); } catch {}
+    try { const r = await fetch(`${CASINO_API}/api/casino/balance/${sid}`,{signal:AbortSignal.timeout(20000)}); const d = await r.json(); _updateTopbar(d); } catch {}
     _bjReset();
     document.getElementById('bj-result-overlay').style.display = 'none';
   }
