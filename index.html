@@ -1518,22 +1518,10 @@
   <div class="casino-wrap">
     <div class="section-label" style="text-align:center;margin-bottom:.5rem;">Astro Casino</div>
     <h2 class="section-title" style="text-align:center;font-size:2.2rem;margin-bottom:.5rem;">🎰 Casino</h2>
-    <p class="section-sub" style="text-align:center;margin-bottom:2rem;">Gioca con il tuo saldo Discord direttamente nel browser.</p>
-
-    <!-- LOGIN VIEW -->
-    <div id="casino-login-view">
-      <div class="casino-login-panel">
-        <div style="font-size:3rem;margin-bottom:.75rem;">🎰</div>
-        <h2>Accedi al Casino</h2>
-        <p>Inserisci il tuo <strong>Discord User ID</strong> per accedere al saldo collegato al bot.<br><small style="color:var(--muted)">Trovi il tuo ID in Discord → Impostazioni → Avanzate → Modalità sviluppatore, poi click destro sul tuo profilo.</small></p>
-        <input type="text" id="casino-userid-input" class="casino-login-input" placeholder="Es: 123456789012345678" maxlength="30">
-        <button class="casino-login-btn" onclick="casinoLogin()">Entra al Casino</button>
-        <div id="casino-login-err" class="casino-login-err"></div>
-      </div>
-    </div>
+    <p class="section-sub" style="text-align:center;margin-bottom:2rem;">Gioca gratis — ogni sessione parte con <strong>5€</strong> in crediti.</p>
 
     <!-- LOBBY VIEW -->
-    <div id="casino-lobby-view" style="display:none">
+    <div id="casino-lobby-view">
       <!-- Balance bar -->
       <div class="casino-topbar">
         <img class="ltc-logo" src="https://s2.coinmarketcap.com/static/img/coins/64x64/2.png" alt="LTC">
@@ -1541,7 +1529,7 @@
         <span class="bal-sep">·</span>
         <span class="bal-eur" id="topbar-eur">0.00€</span>
         <span class="bal-streak" id="topbar-streak" style="display:none"></span>
-        <button class="bal-logout" onclick="casinoLogout()">↩ Esci</button>
+        <button class="bal-logout" onclick="casinoReset()" title="Nuova sessione (reset saldo)">🔄 Reset</button>
       </div>
 
       <!-- Game grid -->
@@ -1990,38 +1978,28 @@
   const CASINO_API = window.ASTRO_API || '';
   let _casinoUserId = null;
   let _casinoBal = 0;
-  let _bjBet = 5;
+  let _bjBet = 1;
   let _bjGame = null;
   let _bjLocked = false;
 
+  function _genSessionId() {
+    return 'web_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+  }
+
   function casinoInit() {
-    const saved = localStorage.getItem('casino_userId');
-    if (saved) { _casinoUserId = saved; _showLobby(); }
+    let sid = localStorage.getItem('casino_sessionId');
+    if (!sid) { sid = _genSessionId(); localStorage.setItem('casino_sessionId', sid); }
+    _casinoUserId = sid;
+    _showLobby();
   }
   casinoInit();
 
-  async function casinoLogin() {
-    const id = document.getElementById('casino-userid-input').value.trim();
-    const err = document.getElementById('casino-login-err');
-    err.textContent = '';
-    if (!/^\d{15,20}$/.test(id)) { err.textContent = 'ID non valido — deve essere un numero di 15-20 cifre.'; return; }
-    try {
-      const r = await fetch(`${CASINO_API}/api/casino/balance/${id}`, { signal: AbortSignal.timeout(6000) });
-      if (!r.ok) throw new Error('Errore API');
-      const data = await r.json();
-      _casinoUserId = id;
-      localStorage.setItem('casino_userId', id);
-      _updateTopbar(data);
-      _showLobby(data);
-    } catch(e) { err.textContent = 'Impossibile connettersi. Riprova.'; }
-  }
-
-  function casinoLogout() {
-    _casinoUserId = null;
-    localStorage.removeItem('casino_userId');
-    document.getElementById('casino-login-view').style.display = '';
-    document.getElementById('casino-lobby-view').style.display = 'none';
-    document.getElementById('casino-bj-view').style.display = 'none';
+  function casinoReset() {
+    if (!confirm('Resettare la sessione? Il tuo saldo attuale andrà perso e riceverai 5€ nuovi.')) return;
+    const sid = _genSessionId();
+    localStorage.setItem('casino_sessionId', sid);
+    _casinoUserId = sid;
+    _showLobby();
   }
 
   function _updateTopbar(data) {
@@ -2033,7 +2011,6 @@
     const streak = data.streak || 0;
     const streakEl = document.getElementById('topbar-streak');
     if (streakEl) { if (streak > 1) { streakEl.style.display = ''; streakEl.textContent = `🔥 Streak ×${streak}`; } else streakEl.style.display = 'none'; }
-    // lobby stats
     const gEl = document.getElementById('lobby-games'); if(gEl) gEl.textContent = data.gamesPlayed || 0;
     const wEl = document.getElementById('lobby-won');   if(wEl) wEl.textContent = (data.totalWon||0).toFixed(2) + '€';
     const lEl = document.getElementById('lobby-lost');  if(lEl) lEl.textContent = (data.totalLost||0).toFixed(2) + '€';
@@ -2044,7 +2021,6 @@
       try { const r = await fetch(`${CASINO_API}/api/casino/balance/${_casinoUserId}`,{signal:AbortSignal.timeout(5000)}); data = await r.json(); } catch {}
     }
     if (data) _updateTopbar(data);
-    document.getElementById('casino-login-view').style.display = 'none';
     document.getElementById('casino-lobby-view').style.display = '';
     document.getElementById('casino-bj-view').style.display = 'none';
   }

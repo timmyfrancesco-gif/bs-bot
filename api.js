@@ -416,21 +416,27 @@ function _ltcPrice(){
   return 85;
 }
 
-// GET /api/casino/balance/:userId
-app.get('/api/casino/balance/:userId',(req,res)=>{
-  const data=load('user_balances.json');
-  const u=data[req.params.userId]||{balance:0};
+function loadSessions(){const p=path.join(DATA_DIR,'casino_sessions.json');if(!fs.existsSync(p))return{};try{return JSON.parse(fs.readFileSync(p,'utf8'));}catch{return{};}}
+function saveSessions(d){fs.writeFileSync(path.join(DATA_DIR,'casino_sessions.json'),JSON.stringify(d,null,2));}
+function getSession(sid){
+  const data=loadSessions();
+  if(!data[sid]){data[sid]={balance:5,totalWagered:0,totalWon:0,totalLost:0,gamesPlayed:0,blackjackStreak:0,biggestWin:0,createdAt:Date.now()};saveSessions(data);}
+  return{data,stats:data[sid]};
+}
+
+// GET /api/casino/balance/:sessionId
+app.get('/api/casino/balance/:sessionId',(req,res)=>{
+  const{stats}=getSession(req.params.sessionId);
   const ltcEur=_ltcPrice();
-  res.json({eur:u.balance||0,ltc:ltcEur>0?((u.balance||0)/ltcEur):0,gamesPlayed:u.gamesPlayed||0,totalWon:u.totalWon||0,totalLost:u.totalLost||0,streak:u.blackjackStreak||0,biggestWin:u.biggestWin||0});
+  res.json({eur:stats.balance||0,ltc:ltcEur>0?((stats.balance||0)/ltcEur):0,gamesPlayed:stats.gamesPlayed||0,totalWon:stats.totalWon||0,totalLost:stats.totalLost||0,streak:stats.blackjackStreak||0,biggestWin:stats.biggestWin||0});
 });
 
 // POST /api/casino/bj/deal
 app.post('/api/casino/bj/deal',(req,res)=>{
   const{userId,bet}=req.body;
   if(!userId||!bet||bet<1)return res.status(400).json({error:'Parametri non validi'});
-  const data=load('user_balances.json');
-  if(!data[userId])data[userId]={balance:0};
-  const stats=data[userId];
+  const{data,stats}=getSession(userId);
+  if(!data[userId])data[userId]=stats;
   const betInt=Math.round(bet);
   if((stats.balance||0)<betInt)return res.status(400).json({error:'Saldo insufficiente'});
   stats.balance=(stats.balance||0)-betInt;
@@ -440,13 +446,13 @@ app.post('/api/casino/bj/deal',(req,res)=>{
   const playerHands=[{cards:[shoe.pop(),shoe.pop()],bet:betInt,surrendered:false,doubled:false}];
   const game={userId,shoe,dealerHand,playerHands,currentHandIndex:0,insuranceBet:0,phase:'playing',createdAt:Date.now()};
   webBJGames[userId]=game;
-  save('user_balances.json',data);
+  saveSessions(data);
   const needsInsurance=dealerHand[0].r==='A';
   const playerBJ=_bj(playerHands[0].cards);
   let result=null;
   if(playerBJ){
     const{results,profit}=_applyResults(game,stats);
-    save('user_balances.json',data);
+    saveSessions(data);
     result={results,profit};
   }
   res.json({ok:true,game:_serGame(game,playerBJ),needsInsurance:needsInsurance&&!playerBJ,playerBlackjack:playerBJ,dealerBlackjack:playerBJ?_bj(dealerHand):null,balance:stats.balance,...(result||{})});
@@ -457,8 +463,7 @@ app.post('/api/casino/bj/action',(req,res)=>{
   const{userId,action}=req.body;
   const game=webBJGames[userId];
   if(!game)return res.status(400).json({error:'Nessun gioco attivo'});
-  const data=load('user_balances.json');
-  const stats=data[userId]||{balance:0};
+  const{data,stats}=getSession(userId);
   const hand=game.playerHands[game.currentHandIndex];
 
   if(action==='insurance'){
@@ -466,7 +471,7 @@ app.post('/api/casino/bj/action',(req,res)=>{
     if((stats.balance||0)<cost)return res.status(400).json({error:'Saldo insufficiente per assicurazione'});
     stats.balance=(stats.balance||0)-cost;
     game.insuranceBet=cost;
-    save('user_balances.json',data);
+    saveSessions(data);
     return res.json({ok:true,game:_serGame(game,false),balance:stats.balance});
   }
   if(action==='no_insurance'){
@@ -476,11 +481,11 @@ app.post('/api/casino/bj/action',(req,res)=>{
     if(game.shoe.length<60)game.shoe.push(..._shoe(6));
     hand.cards.push(game.shoe.pop());
     const val=_hv(hand.cards);
-    if(val>=21){const r=_advanceOrDealer(game,data,stats);save('user_balances.json',data);return res.json(r);}
+    if(val>=21){const r=_advanceOrDealer(game,data,stats);saveSessions(data);return res.json(r);}
     return res.json({ok:true,game:_serGame(game,false),balance:stats.balance});
   }
   if(action==='stand'){
-    const r=_advanceOrDealer(game,data,stats);save('user_balances.json',data);return res.json(r);
+    const r=_advanceOrDealer(game,data,stats);saveSessions(data);return res.json(r);
   }
   if(action==='double'){
     if((stats.balance||0)<hand.bet)return res.status(400).json({error:'Saldo insufficiente per raddoppio'});
@@ -489,8 +494,8 @@ app.post('/api/casino/bj/action',(req,res)=>{
     hand.bet*=2;hand.doubled=true;
     if(game.shoe.length<60)game.shoe.push(..._shoe(6));
     hand.cards.push(game.shoe.pop());
-    save('user_balances.json',data);
-    const r=_advanceOrDealer(game,data,stats);save('user_balances.json',data);return res.json(r);
+    saveSessions(data);
+    const r=_advanceOrDealer(game,data,stats);saveSessions(data);return res.json(r);
   }
   if(action==='split'){
     if(!_split(hand.cards)||game.playerHands.length>=4)return res.status(400).json({error:'Split non disponibile'});
@@ -501,12 +506,12 @@ app.post('/api/casino/bj/action',(req,res)=>{
     const newHand={cards:[hand.cards.pop(),game.shoe.pop()],bet:hand.bet,surrendered:false,doubled:false};
     hand.cards.push(game.shoe.pop());
     game.playerHands.splice(game.currentHandIndex+1,0,newHand);
-    save('user_balances.json',data);
+    saveSessions(data);
     return res.json({ok:true,game:_serGame(game,false),balance:stats.balance});
   }
   if(action==='surrender'){
     hand.surrendered=true;
-    const r=_advanceOrDealer(game,data,stats);save('user_balances.json',data);return res.json(r);
+    const r=_advanceOrDealer(game,data,stats);saveSessions(data);return res.json(r);
   }
   return res.status(400).json({error:'Azione non valida'});
 });
