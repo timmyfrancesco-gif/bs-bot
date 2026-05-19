@@ -252,6 +252,19 @@
     .bj-surrender-btn:hover:not(:disabled) { background: rgba(255,100,100,.07); }
     .bj-surrender-btn:disabled { opacity: .22; cursor: default; }
 
+    .bj-autobet-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #0d0f18; border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px; padding: .5rem .75rem;
+    }
+    .bj-autobet-label { font-size: .78rem; color: var(--muted); font-weight: 600; }
+    .bj-autobet-toggle {
+      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+      color: var(--muted); border-radius: 20px; padding: .22rem .7rem;
+      font-size: .75rem; font-weight: 700; cursor: pointer; transition: all .2s; letter-spacing: .5px;
+    }
+    .bj-autobet-toggle.active { background: #1e6e3c; border-color: #2d9e57; color: #fff; }
+
     .bj-insurance-prompt {
       background: rgba(251,191,36,.06); border: 1px solid rgba(251,191,36,.22);
       border-radius: 10px; padding: .7rem; text-align: center;
@@ -331,9 +344,14 @@
     .card-center { font-size: 38px; text-align: center; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
 
     @keyframes cardDeal {
-      from { opacity: 0; transform: translateY(-35px) scale(.82); }
-      to   { opacity: 1; transform: translateY(0)    scale(1); }
+      from { opacity: 0; transform: translateY(-55px) rotate(-10deg) scale(.72); }
+      to   { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
     }
+    @keyframes cardFlip {
+      0%   { transform: rotateY(90deg) scale(.92); opacity: 0; }
+      100% { transform: rotateY(0deg)  scale(1);   opacity: 1; }
+    }
+    .playing-card.flip-reveal { animation: cardFlip .28s cubic-bezier(.25,.8,.25,1) both; }
 
     @media(max-width:700px){
       .bj-layout { flex-direction: column; }
@@ -482,6 +500,12 @@
             </div>
             <button class="bj-surrender-btn" id="btn-surrender" onclick="bjAct('surrender')">🏳️ Resa (50%)</button>
           </div>
+
+          <!-- Autobet -->
+          <div class="bj-autobet-row">
+            <span class="bj-autobet-label">Auto Bet</span>
+            <button class="bj-autobet-toggle" id="bj-autobet-btn" onclick="toggleAutoBet()">OFF</button>
+          </div>
         </div>
 
         <!-- RIGHT: cards -->
@@ -515,6 +539,14 @@
   let _bjGame = null;
   let _bjLocked = false;
   let _ltcEur = null;
+  let _autoBet = false;
+
+  function toggleAutoBet() {
+    _autoBet = !_autoBet;
+    const btn = document.getElementById('bj-autobet-btn');
+    btn.textContent = _autoBet ? 'ON' : 'OFF';
+    btn.classList.toggle('active', _autoBet);
+  }
 
   // ── SESSION (localStorage, no server) ──
   const _SK = 'astro_casino_v1';
@@ -626,7 +658,7 @@
 
   async function _finishGame(stats) {
     document.getElementById('bj-status').textContent = '🎰 Il dealer pesca...';
-    await new Promise(r => setTimeout(r, 700));
+    await new Promise(r => setTimeout(r, 350));
     _dealerDraw();
     _bjGame.phase = 'result';
     const { results, profit } = _calcResults(stats);
@@ -732,9 +764,14 @@
   function _renderCards(hand, container, hideHole = false, baseDelay = 0) {
     container.innerHTML = '';
     hand.forEach((card, i) => {
-      // hole card = index 1 (dealer's second card), stays face-down while player plays
       const faceDown = hideHole && i === 1;
-      container.appendChild(_makeCard(faceDown ? null : card, baseDelay + i * 120));
+      const cardEl = _makeCard(faceDown ? null : card, baseDelay + i * 120);
+      // Flip animation when hole card is revealed
+      if (!hideHole && i === 1 && hand.length >= 2) {
+        cardEl.style.animation = 'none';
+        cardEl.classList.add('flip-reveal');
+      }
+      container.appendChild(cardEl);
     });
   }
 
@@ -783,9 +820,9 @@
       () => pRow.appendChild(_makeCard(game.playerHands[0].cards[1], 0)),       // player card 2 face-up
       () => dealerEl.appendChild(_makeCard(null, 0)),                           // dealer card 2 face-DOWN (hole)
     ];
-    for (const step of seq) { step(); await new Promise(r => setTimeout(r, 300)); }
+    for (const step of seq) { step(); await new Promise(r => setTimeout(r, 180)); }
     pBubble.textContent = _handVal(game.playerHands[0].cards);
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 80));
   }
 
   // ── DEAL ──
@@ -954,8 +991,13 @@
       return;
     }
 
-    // Auto-reset after 2s so player can bet again
-    setTimeout(() => _bjReset(), 2000);
+    // Auto-reset after 900ms so player can bet again
+    setTimeout(() => {
+      _bjReset();
+      if (_autoBet && _casinoBal >= Math.max(0.5, _bjBet)) {
+        setTimeout(() => dealBJ(), 100);
+      }
+    }, 900);
   }
 
   function bjRefill() {
