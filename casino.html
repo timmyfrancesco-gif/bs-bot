@@ -227,14 +227,15 @@
 
     .bj-scommetti-btn {
       width: 100%; border: none; color: #fff;
-      border-radius: 10px; padding: .8rem; font-size: .95rem; font-weight: 800;
-      cursor: pointer; transition: background .2s; letter-spacing: .3px;
-      background: #1e6e3c;
+      border-radius: 10px; padding: .85rem; font-size: 1rem; font-weight: 800;
+      cursor: pointer; transition: opacity .15s, transform .1s; letter-spacing: .3px;
+      background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+      margin-top: auto;
     }
-    .bj-scommetti-btn:hover:not(:disabled) { background: #2d9e57; }
-    .bj-scommetti-btn:disabled { background: #1c1f2e; color: rgba(255,255,255,.28); cursor: default; }
+    .bj-scommetti-btn:hover:not(:disabled) { opacity: .88; transform: translateY(-1px); }
+    .bj-scommetti-btn:disabled { opacity: .3; cursor: default; transform: none; }
 
-    .bj-action-panel { display: none; flex-direction: column; gap: .5rem; }
+    .bj-action-panel { display: flex; flex-direction: column; gap: .5rem; }
     .bj-act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
     .bj-act-btn {
       background: #1e2130; border: 1px solid rgba(255,255,255,.08); color: var(--text);
@@ -243,7 +244,7 @@
       display: flex; align-items: center; justify-content: center; gap: .35rem;
     }
     .bj-act-btn:hover:not(:disabled) { background: #262a3d; }
-    .bj-act-btn:disabled { opacity: .25; cursor: default; }
+    .bj-act-btn:disabled { opacity: .22; cursor: default; }
     .bj-surrender-btn {
       background: none; border: 1px solid rgba(255,100,100,.22); color: rgba(255,140,140,.7);
       border-radius: 9px; padding: .42rem; font-size: .78rem; font-weight: 600;
@@ -263,7 +264,7 @@
       color: var(--muted); border-radius: 20px; padding: .22rem .7rem;
       font-size: .75rem; font-weight: 700; cursor: pointer; transition: all .2s; letter-spacing: .5px;
     }
-    .bj-autobet-toggle.active { background: #1e6e3c; border-color: #2d9e57; color: #fff; }
+    .bj-autobet-toggle.active { background: #6d28d9; border-color: #7c3aed; color: #fff; }
 
     .bj-insurance-prompt {
       background: rgba(251,191,36,.06); border: 1px solid rgba(251,191,36,.22);
@@ -323,7 +324,7 @@
       padding: 5px 7px;
       font-family: 'Georgia','Times New Roman',serif; font-weight: bold;
       position: relative; user-select: none;
-      animation: cardDeal .3s cubic-bezier(.34,1.56,.64,1) both;
+      animation: cardDeal .18s cubic-bezier(.34,1.56,.64,1) both;
       flex-shrink: 0; transition: box-shadow .3s;
     }
     .playing-card.red { color: #cc0000; }
@@ -475,30 +476,29 @@
             </div>
           </div>
 
-          <!-- Bet panel -->
-          <div id="bj-bet-panel">
+          <!-- Bet input -->
+          <div>
             <div class="bj-bet-header">
               <span class="bj-bet-label">Importo scommessa</span>
               <span class="bj-bet-ltc-disp" id="bj-bet-ltc">0.00000000 LTC</span>
             </div>
-            <div class="bj-bet-input-row" style="margin:.4rem 0 .6rem">
+            <div class="bj-bet-input-row" style="margin:.4rem 0 0">
               <span class="bj-eur-sign">€</span>
               <input type="number" class="bj-bet-input" id="bj-custom-bet" min="0.5" step="0.5" value="1" oninput="selectCustomBet(this.value)">
-              <button class="bj-frac-btn" onclick="halveBet()">½</button>
-              <button class="bj-frac-btn" onclick="doubleBet()">2x</button>
+              <button class="bj-frac-btn" id="btn-halve" onclick="halveBet()">½</button>
+              <button class="bj-frac-btn" id="btn-double-bet" onclick="doubleBet()">2x</button>
             </div>
-            <button class="bj-scommetti-btn" id="bj-deal-btn" onclick="dealBJ()">Scommetti</button>
           </div>
 
-          <!-- Action panel -->
-          <div class="bj-action-panel" id="bj-action-panel">
+          <!-- Action buttons — always visible, enabled only when playing -->
+          <div class="bj-action-panel">
             <div class="bj-act-grid">
-              <button class="bj-act-btn" onclick="bjAct('hit')">📥 Chiedi carta</button>
-              <button class="bj-act-btn" onclick="bjAct('stand')">🖐️ Resta</button>
-              <button class="bj-act-btn" id="btn-split"  onclick="bjAct('split')">↕️ Dividi</button>
-              <button class="bj-act-btn" id="btn-double" onclick="bjAct('double')">⬆️ Raddoppia</button>
+              <button class="bj-act-btn" id="btn-hit"    onclick="bjAct('hit')"    disabled>📥 Chiedi carta</button>
+              <button class="bj-act-btn" id="btn-stand"  onclick="bjAct('stand')"  disabled>🖐️ Resta</button>
+              <button class="bj-act-btn" id="btn-split"  onclick="bjAct('split')"  disabled>↕️ Dividi</button>
+              <button class="bj-act-btn" id="btn-double" onclick="bjAct('double')" disabled>⬆️ Raddoppia</button>
             </div>
-            <button class="bj-surrender-btn" id="btn-surrender" onclick="bjAct('surrender')">🏳️ Resa (50%)</button>
+            <button class="bj-surrender-btn" id="btn-surrender" onclick="bjAct('surrender')" disabled>🏳️ Resa (50%)</button>
           </div>
 
           <!-- Autobet -->
@@ -506,6 +506,9 @@
             <span class="bj-autobet-label">Auto Bet</span>
             <button class="bj-autobet-toggle" id="bj-autobet-btn" onclick="toggleAutoBet()">OFF</button>
           </div>
+
+          <!-- Scommetti — always at bottom -->
+          <button class="bj-scommetti-btn" id="bj-deal-btn" onclick="dealBJ()">Scommetti</button>
         </div>
 
         <!-- RIGHT: cards -->
@@ -658,7 +661,7 @@
 
   async function _finishGame(stats) {
     document.getElementById('bj-status').textContent = '🎰 Il dealer pesca...';
-    await new Promise(r => setTimeout(r, 350));
+    await new Promise(r => setTimeout(r, 250));
     _dealerDraw();
     _bjGame.phase = 'result';
     const { results, profit } = _calcResults(stats);
@@ -719,6 +722,27 @@
 
   function closeBJ() { _showLobby(); }
 
+  function _bjSetIdle() {
+    document.getElementById('bj-deal-btn').disabled = false;
+    document.getElementById('bj-custom-bet').disabled = false;
+    document.getElementById('btn-halve').disabled = false;
+    document.getElementById('btn-double-bet').disabled = false;
+    ['btn-hit','btn-stand','btn-split','btn-double','btn-surrender'].forEach(id => { document.getElementById(id).disabled = true; });
+  }
+  function _bjSetPlaying() {
+    document.getElementById('bj-deal-btn').disabled = true;
+    document.getElementById('bj-custom-bet').disabled = true;
+    document.getElementById('btn-halve').disabled = true;
+    document.getElementById('btn-double-bet').disabled = true;
+    ['btn-hit','btn-stand'].forEach(id => { document.getElementById(id).disabled = false; });
+  }
+  function _bjSetLocked() {
+    ['bj-deal-btn','btn-hit','btn-stand','btn-split','btn-double','btn-surrender'].forEach(id => { document.getElementById(id).disabled = true; });
+    document.getElementById('bj-custom-bet').disabled = true;
+    document.getElementById('btn-halve').disabled = true;
+    document.getElementById('btn-double-bet').disabled = true;
+  }
+
   function _bjReset() {
     _bjGame = null; _bjLocked = false;
     document.getElementById('dealer-cards').innerHTML = '';
@@ -726,10 +750,8 @@
     const dv = document.getElementById('dealer-val');
     dv.textContent = '?'; dv.className = 'bj-hand-bubble';
     document.getElementById('bj-insurance-prompt').style.display = 'none';
-    document.getElementById('bj-bet-panel').style.display = 'block';
-    document.getElementById('bj-action-panel').style.display = 'none';
     const st = document.getElementById('bj-status'); st.textContent = ''; st.style.color = '';
-    document.getElementById('bj-deal-btn').disabled = false;
+    _bjSetIdle();
     _updateBetLtc();
   }
 
@@ -820,9 +842,9 @@
       () => pRow.appendChild(_makeCard(game.playerHands[0].cards[1], 0)),       // player card 2 face-up
       () => dealerEl.appendChild(_makeCard(null, 0)),                           // dealer card 2 face-DOWN (hole)
     ];
-    for (const step of seq) { step(); await new Promise(r => setTimeout(r, 180)); }
+    for (const step of seq) { step(); await new Promise(r => setTimeout(r, 130)); }
     pBubble.textContent = _handVal(game.playerHands[0].cards);
-    await new Promise(r => setTimeout(r, 80));
+    await new Promise(r => setTimeout(r, 50));
   }
 
   // ── DEAL ──
@@ -833,7 +855,7 @@
     if (bet > _casinoBal) { document.getElementById('bj-status').textContent = `❌ Saldo insufficiente (hai ${_casinoBal.toFixed(2)}€)`; return; }
 
     _bjLocked = true;
-    document.getElementById('bj-deal-btn').disabled = true;
+    _bjSetLocked();
     document.getElementById('bj-status').textContent = '🃏 Distribuzione in corso...';
 
     const betInt = Math.round(bet);
@@ -852,8 +874,6 @@
       currentHandIndex: 0, insuranceBet: 0, phase: 'playing',
     };
 
-    document.getElementById('bj-bet-panel').style.display = 'none';
-    document.getElementById('bj-status').textContent = '';
     document.getElementById('bj-status').textContent = '';
 
     await _animateDeal(_bjGame);
@@ -874,12 +894,11 @@
       const maxIns = Math.floor(betInt / 2);
       document.getElementById('bj-ins-yes-btn').textContent = `✅ Sì (${maxIns}€)`;
       document.getElementById('bj-insurance-prompt').style.display = 'block';
-      document.getElementById('bj-action-panel').style.display = 'none';
       _bjLocked = false;
       return;
     }
 
-    document.getElementById('bj-action-panel').style.display = 'flex';
+    _bjSetPlaying();
     _updateBJDisplay(_bjGame, false);
     _bjLocked = false;
   }
@@ -890,13 +909,13 @@
     if (yes) {
       const cost = Math.floor(_bjGame.playerHands[0].bet / 2);
       const stats = _loadStats();
-      if ((stats.balance || 0) < cost) { document.getElementById('bj-status').textContent = '❌ Saldo insufficiente'; document.getElementById('bj-action-panel').style.display = 'flex'; return; }
+      if ((stats.balance || 0) < cost) { document.getElementById('bj-status').textContent = '❌ Saldo insufficiente'; _bjSetPlaying(); return; }
       stats.balance -= cost; _casinoBal = stats.balance;
       _bjGame.insuranceBet = cost;
       _saveStats(stats); _updateTopbarBal();
     }
+    _bjSetPlaying();
     _updateBJDisplay(_bjGame, false);
-    document.getElementById('bj-action-panel').style.display = 'flex';
   }
 
   // ── ACTIONS ──
@@ -909,31 +928,31 @@
     const stats = _loadStats();
     const hand = _bjGame.playerHands[_bjGame.currentHandIndex];
 
+    const _resume = () => { document.getElementById('bj-status').textContent=''; _bjSetPlaying(); _updateBJDisplay(_bjGame, false); };
+
     if (action === 'hit') {
       _refillShoe(); hand.cards.push(_bjGame.shoe.pop());
       if (_handVal(hand.cards) >= 21) {
         _bjGame.currentHandIndex++;
         if (_bjGame.currentHandIndex >= _bjGame.playerHands.length) { await _finishGame(stats); }
-        else { document.getElementById('bj-status').textContent=''; _updateBJDisplay(_bjGame, false); document.getElementById('bj-action-panel').style.display='flex'; }
-      } else {
-        document.getElementById('bj-status').textContent=''; _updateBJDisplay(_bjGame, false); document.getElementById('bj-action-panel').style.display = 'flex';
-      }
+        else { _resume(); }
+      } else { _resume(); }
     } else if (action === 'stand') {
       _bjGame.currentHandIndex++;
       if (_bjGame.currentHandIndex >= _bjGame.playerHands.length) { await _finishGame(stats); }
-      else { document.getElementById('bj-status').textContent=''; _updateBJDisplay(_bjGame, false); document.getElementById('bj-action-panel').style.display='flex'; }
+      else { _resume(); }
     } else if (action === 'double') {
-      if ((stats.balance || 0) < hand.bet) { document.getElementById('bj-status').textContent='❌ Saldo insufficiente'; document.getElementById('bj-action-panel').style.display='flex'; _bjLocked=false; return; }
+      if ((stats.balance || 0) < hand.bet) { document.getElementById('bj-status').textContent='❌ Saldo insufficiente'; _bjSetPlaying(); _bjLocked=false; return; }
       stats.balance -= hand.bet; stats.totalWagered = (stats.totalWagered||0) + hand.bet;
       hand.bet *= 2; hand.doubled = true;
       _casinoBal = stats.balance; _saveStats(stats); _updateTopbarBal();
       _refillShoe(); hand.cards.push(_bjGame.shoe.pop());
       _bjGame.currentHandIndex++;
       if (_bjGame.currentHandIndex >= _bjGame.playerHands.length) { await _finishGame(stats); }
-      else { document.getElementById('bj-status').textContent=''; _updateBJDisplay(_bjGame, false); document.getElementById('bj-action-panel').style.display='flex'; }
+      else { _resume(); }
     } else if (action === 'split') {
       if ((stats.balance || 0) < hand.bet || !(_handVal([hand.cards[0]]) === _handVal([hand.cards[1]])) || _bjGame.playerHands.length >= 4) {
-        document.getElementById('bj-action-panel').style.display='flex'; _bjLocked=false; return;
+        _bjSetPlaying(); _bjLocked=false; return;
       }
       stats.balance -= hand.bet; stats.totalWagered = (stats.totalWagered||0) + hand.bet;
       _casinoBal = stats.balance; _saveStats(stats); _updateTopbarBal();
@@ -941,12 +960,12 @@
       const newHand = { cards: [hand.cards.pop(), _bjGame.shoe.pop()], bet: hand.bet, surrendered: false, doubled: false };
       _refillShoe(); hand.cards.push(_bjGame.shoe.pop());
       _bjGame.playerHands.splice(_bjGame.currentHandIndex + 1, 0, newHand);
-      document.getElementById('bj-status').textContent=''; _updateBJDisplay(_bjGame, false); document.getElementById('bj-action-panel').style.display='flex';
+      _resume();
     } else if (action === 'surrender') {
       hand.surrendered = true;
       _bjGame.currentHandIndex++;
       if (_bjGame.currentHandIndex >= _bjGame.playerHands.length) { await _finishGame(stats); }
-      else { document.getElementById('bj-status').textContent=''; _updateBJDisplay(_bjGame, false); document.getElementById('bj-action-panel').style.display='flex'; }
+      else { _resume(); }
     }
     _bjLocked = false;
   }
@@ -976,28 +995,26 @@
     statusEl.textContent = `${sign}${profit.toFixed(2)}€  •  Saldo: ${newBalance.toFixed(2)}€`;
     statusEl.style.color = isWin ? '#4ade80' : isLoss ? '#f87171' : '#fb923c';
 
-    // If broke, show refill immediately
+    _bjSetLocked();
+
+    // If broke, show refill button
     if (newBalance < 1) {
-      document.getElementById('bj-bet-panel').style.display = 'block';
-      document.getElementById('bj-action-panel').style.display = 'none';
-      document.getElementById('bj-deal-btn').disabled = true;
-      statusEl.textContent += '  —  ';
       const refillBtn = document.createElement('button');
       refillBtn.className = 'bj-btn primary';
-      refillBtn.style.cssText = 'background:#b5a06e;border-color:#b5a06e;color:#000;margin-top:.4rem;width:100%';
+      refillBtn.style.cssText = 'background:#7c3aed;border-color:#7c3aed;color:#fff;margin-top:.4rem;width:100%;border-radius:10px;padding:.7rem;font-weight:700;cursor:pointer;';
       refillBtn.textContent = '🪙 Riprendi 5€ gratis';
       refillBtn.onclick = bjRefill;
       statusEl.after(refillBtn);
       return;
     }
 
-    // Auto-reset after 900ms so player can bet again
+    // Auto-reset after 800ms so player can bet again
     setTimeout(() => {
       _bjReset();
       if (_autoBet && _casinoBal >= Math.max(0.5, _bjBet)) {
-        setTimeout(() => dealBJ(), 100);
+        setTimeout(() => dealBJ(), 80);
       }
-    }, 900);
+    }, 800);
   }
 
   function bjRefill() {
