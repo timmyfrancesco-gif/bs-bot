@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C Online Compiler</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #58a6ff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header h1 span { font-size: 22px; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+    }
+
+    select {
+      background: #21262d;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    select:focus { border-color: #58a6ff; }
+
+    #run-btn {
+      background: #238636;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+
+    #run-btn:hover { background: #2ea043; }
+    #run-btn:disabled { background: #1f4a23; color: #8b949e; cursor: not-allowed; }
+
+    #run-btn .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: none;
+    }
+
+    #run-btn.loading .spinner { display: block; }
+    #run-btn.loading .icon { display: none; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .editor-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #30363d;
+      min-width: 0;
+    }
+
+    .pane-header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 6px 16px;
+      font-size: 12px;
+      color: #8b949e;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .pane-header .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #58a6ff;
+    }
+
+    #editor {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .output-pane {
+      width: 380px;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    #output {
+      flex: 1;
+      background: #0d1117;
+      padding: 16px;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    #output.empty { color: #484f58; font-style: italic; }
+
+    .output-success { color: #3fb950; }
+    .output-error   { color: #f85149; }
+    .output-info    { color: #8b949e; }
+    .output-stderr  { color: #d29922; }
+
+    #stdin-area {
+      border-top: 1px solid #30363d;
+      background: #161b22;
+      flex-shrink: 0;
+    }
+
+    #stdin-label {
+      padding: 6px 16px;
+      font-size: 12px;
+      color: #8b949e;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #stdin {
+      width: 100%;
+      background: #0d1117;
+      color: #e6edf3;
+      border: none;
+      border-top: 1px solid #21262d;
+      padding: 8px 16px;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 13px;
+      resize: none;
+      outline: none;
+      height: 60px;
+    }
+
+    #stdin::placeholder { color: #484f58; }
+
+    .status-bar {
+      background: #161b22;
+      border-top: 1px solid #30363d;
+      padding: 4px 16px;
+      font-size: 11px;
+      color: #8b949e;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    #status-msg { margin-left: auto; }
+
+    @media (max-width: 700px) {
+      .main { flex-direction: column; }
+      .output-pane { width: 100%; height: 40vh; border-top: 1px solid #30363d; }
+      .editor-pane { border-right: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><span>⚙️</span> C Online Compiler</h1>
+  <div class="controls">
+    <select id="compiler-select">
+      <option value="gcc-head">GCC (latest)</option>
+      <option value="gcc-13.2.0">GCC 13.2</option>
+      <option value="gcc-12.3.0">GCC 12.3</option>
+      <option value="clang-head">Clang (latest)</option>
+      <option value="clang-17.0.1">Clang 17</option>
+    </select>
+    <button id="run-btn" onclick="runCode()">
+      <span class="icon">▶ Esegui</span>
+      <span class="spinner"></span>
+    </button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="editor-pane">
+    <div class="pane-header"><div class="dot"></div> main.c</div>
+    <div id="editor"></div>
+  </div>
+  <div class="output-pane">
+    <div class="pane-header"><div class="dot" style="background:#3fb950"></div> Output</div>
+    <div id="output" class="empty">Premi ▶ Esegui per compilare ed eseguire il codice.</div>
+    <div id="stdin-area">
+      <div id="stdin-label">📥 Input (stdin)</div>
+      <textarea id="stdin" placeholder="Inserisci l'input del programma qui..."></textarea>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span>C · Wandbox API</span>
+  <span id="status-msg"></span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+<script>
+const DEFAULT_CODE = `#include <stdio.h>
+
+int main() {
+    printf("Hello, World!\\n");
+
+    int n = 10;
+    int sum = 0;
+    for (int i = 1; i <= n; i++) {
+        sum += i;
+    }
+    printf("Somma da 1 a %d = %d\\n", n, sum);
+
+    return 0;
+}
+`;
+
+let editor;
+
+require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+require(['vs/editor/editor.main'], function () {
+  editor = monaco.editor.create(document.getElementById('editor'), {
+    value: DEFAULT_CODE,
+    language: 'c',
+    theme: 'vs-dark',
+    fontSize: 14,
+    fontFamily: "'Cascadia Code', 'Fira Code', Consolas, monospace",
+    minimap: { enabled: false },
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
+    tabSize: 4,
+    insertSpaces: true,
+    wordWrap: 'on',
+    lineNumbers: 'on',
+    renderLineHighlight: 'all',
+    cursorBlinking: 'smooth',
+  });
+
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runCode);
+});
+
+async function runCode() {
+  const btn = document.getElementById('run-btn');
+  const out = document.getElementById('output');
+  const status = document.getElementById('status-msg');
+
+  const code     = editor ? editor.getValue() : '';
+  const stdin    = document.getElementById('stdin').value;
+  const compiler = document.getElementById('compiler-select').value;
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  out.className = '';
+  out.innerHTML = '<span class="output-info">Compilazione in corso...</span>';
+  status.textContent = 'Compilando...';
+
+  try {
+    const resp = await fetch('https://wandbox.org/api/compile.json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        compiler,
+        code,
+        stdin,
+        options: 'warning,c11',
+        'compiler-option-raw': '-lm',
+      }),
+    });
+
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    let html = '';
+
+    if (data.compiler_output || data.compiler_error) {
+      const compOut = (data.compiler_output || '') + (data.compiler_error || '');
+      if (compOut.trim()) {
+        html += `<span class="output-stderr">── Compiler output ──\n${esc(compOut)}\n</span>`;
+      }
+    }
+
+    const exitCode = parseInt(data.status ?? '0');
+
+    if (data.program_output || data.program_error) {
+      const progOut = (data.program_output || '') + (data.program_error || '');
+      if (progOut.trim()) {
+        html += `<span class="${exitCode === 0 ? 'output-success' : 'output-error'}">${esc(progOut)}</span>`;
+      }
+    }
+
+    if (!html) {
+      if (exitCode === 0) {
+        html = '<span class="output-info">(nessun output)</span>';
+      } else {
+        html = `<span class="output-error">Compilazione fallita (exit ${exitCode})</span>`;
+      }
+    }
+
+    html += `\n<span class="output-info">── exit code: ${exitCode} ──</span>`;
+    out.innerHTML = html;
+    status.textContent = exitCode === 0 ? '✓ Eseguito con successo' : `✗ Exit code ${exitCode}`;
+
+  } catch (e) {
+    out.innerHTML = `<span class="output-error">Errore di rete: ${esc(e.message)}\n\nAssicurati di avere una connessione internet.</span>`;
+    status.textContent = '✗ Errore';
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
