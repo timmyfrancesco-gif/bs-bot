@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulatore GPS iPhone</title>
+  <!-- Dichiarare l'icona evita anche la richiesta automatica a /favicon.ico. -->
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="stylesheet" href="/vendor/leaflet.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="map" role="application" aria-label="Mappa per scegliere la posizione"></div>
+
+  <aside class="panel">
+    <header class="panel__header">
+      <h1>Simulatore GPS</h1>
+      <p class="panel__subtitle">iPhone collegato via USB</p>
+    </header>
+
+    <section class="block">
+      <h2 class="block__title">Dispositivo</h2>
+      <div class="row">
+        <select id="device-select" aria-label="iPhone da usare">
+          <option value="">Nessun dispositivo trovato</option>
+        </select>
+        <button id="refresh-devices" class="button button--icon" title="Aggiorna elenco">&#8635;</button>
+      </div>
+      <div class="row">
+        <button id="connect" class="button button--primary">Connetti</button>
+        <button id="disconnect" class="button" hidden>Disconnetti</button>
+      </div>
+      <p id="device-detail" class="hint"></p>
+    </section>
+
+    <section class="block">
+      <h2 class="block__title">Cerca un indirizzo</h2>
+      <div class="row">
+        <input id="search-input" type="search" placeholder="Via, città, monumento…"
+               autocomplete="off" aria-label="Cerca un indirizzo">
+        <button id="search-button" class="button button--icon" title="Cerca">&#9906;</button>
+      </div>
+      <ul id="search-results" class="results" hidden></ul>
+      <p class="hint">Oppure clicca sulla mappa, o trascina il segnaposto.</p>
+    </section>
+
+    <section class="block">
+      <h2 class="block__title">Coordinate scelte</h2>
+      <div class="row row--coords">
+        <label>Lat <input id="lat-input" type="number" step="0.000001" min="-90" max="90"></label>
+        <label>Lon <input id="lon-input" type="number" step="0.000001" min="-180" max="180"></label>
+      </div>
+      <p id="selection-label" class="hint"></p>
+      <button id="apply" class="button button--primary button--block" disabled>
+        Applica posizione all'iPhone
+      </button>
+      <button id="restore" class="button button--danger button--block" disabled>
+        Ripristina posizione reale
+      </button>
+    </section>
+
+    <p class="panel__footer">
+      Serve la modalità sviluppatore attiva, l'iPhone sbloccato e — da iOS 17 —
+      i permessi di amministratore per il tunnel.
+    </p>
+  </aside>
+
+  <div id="alert" class="alert" hidden role="alert">
+    <div class="alert__body">
+      <strong id="alert-message"></strong>
+      <span id="alert-hint"></span>
+      <code id="alert-detail" hidden></code>
+    </div>
+    <button id="alert-close" class="button button--icon" aria-label="Chiudi">&times;</button>
+  </div>
+
+  <footer id="statusbar" class="statusbar" data-state="idle">
+    <span id="state-pill" class="pill">inattivo</span>
+    <span id="location-badge" class="badge">posizione reale</span>
+    <span id="status-message" class="statusbar__message"></span>
+    <span class="statusbar__spacer"></span>
+    <span id="keepalive" class="statusbar__item" hidden>
+      <span class="dot"></span><span id="keepalive-text"></span>
+    </span>
+    <span id="tunnel-info" class="statusbar__item" hidden></span>
+    <span id="backend-info" class="statusbar__item" hidden></span>
+  </footer>
+
+  <script src="/vendor/leaflet.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

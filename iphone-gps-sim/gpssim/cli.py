@@ -1,14 +1,16 @@
-"""CLI di test per il core della fase 1.
+"""Riga di comando: diagnostica del core e avvio dell'interfaccia.
 
-Non è l'interfaccia finale del progetto (quella arriva nella fase 2): serve a
-esercitare device manager, tunnel e location service senza UI, e a diagnosticare
-un dispositivo che non collabora.
+I comandi `devices`, `doctor`, `tunnel`, `set` e `clear` esercitano il core senza
+UI — servono a capire perché un dispositivo non collabora. `serve` e `app` avviano
+l'interfaccia vera, rispettivamente nel browser e in una finestra nativa.
 
     python -m gpssim devices
     python -m gpssim doctor
     python -m gpssim tunnel
     python -m gpssim set 45.4642 9.1900 --hold 30
     python -m gpssim clear
+    python -m gpssim serve --open
+    python -m gpssim app
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from .device import DeviceManager
 from .errors import ErrorCode, GpsSimError
 from .location import LocationSession
 from .models import KEEPALIVE_INTERVAL, Coordinate, SessionState, Status
+from .server import DEFAULT_HOST, DEFAULT_PORT
 from .tunnel import RsdTunnel, is_privileged
 
 EXIT_OK = 0
@@ -233,6 +236,56 @@ async def cmd_clear(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+async def cmd_serve(args: argparse.Namespace) -> int:
+    """Avvia API e interfaccia web, senza aprire una finestra."""
+    from .api import create_app
+    from .server import pick_port, serve
+
+    port = args.port if args.port is not None else pick_port(args.host)
+    session = LocationSession(
+        manager=DeviceManager(allow_sudo=not args.no_sudo),
+        preferred_backend=args.backend,
+    )
+    app = create_app(session=session)
+
+    url = f"http://{args.host}:{port}"
+    _print(f"Interfaccia disponibile su {url}")
+    _print("Ctrl-C per chiudere (la posizione reale viene ripristinata).")
+    if args.open:
+        import webbrowser
+
+        webbrowser.open(url)
+
+    # I segnali sono di uvicorn (vedi `owns_signals` nel parser): installare anche
+    # i nostri handler non funzionerebbe, perché uvicorn li sostituisce quando
+    # `serve()` parte, e Ctrl-C finirebbe nel vuoto. Alla sua uscita graziosa
+    # scatta lo shutdown dell'app, che è dove la posizione reale viene
+    # ripristinata e il tunnel chiuso.
+    try:
+        await serve(app, host=args.host, port=port, log_level="info" if args.verbose else "warning")
+    except Exception as exc:
+        _print(f"✗ Il server locale si è fermato: {exc}")
+        await session.disconnect()
+        return EXIT_ERROR
+
+    _print("Chiusura completata.")
+    # Difensivo: se `serve()` è morta prima dell'avvio, il lifespan non è passato.
+    await session.disconnect()
+    return EXIT_OK
+
+
+def cmd_app(args: argparse.Namespace) -> int:
+    """Apre la finestra nativa. Sincrona: pywebview vuole il thread principale."""
+    from .desktop import PywebviewUnavailableError, run_desktop
+
+    try:
+        run_desktop(host=args.host, port=args.port, allow_sudo=not args.no_sudo, debug=args.verbose > 1)
+    except PywebviewUnavailableError as error:
+        print(f"\n✗ {error}", file=sys.stderr)
+        return EXIT_ERROR
+    return EXIT_OK
+
+
 # --------------------------------------------------------------------------- #
 # Parser
 # --------------------------------------------------------------------------- #
@@ -241,7 +294,7 @@ async def cmd_clear(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="gpssim",
-        description="Simulatore di posizione GPS per iPhone collegato via USB (fase 1: solo core).",
+        description="Simulatore di posizione GPS per iPhone collegato via USB.",
     )
     parser.add_argument("--udid", help="UDID del dispositivo (default: il primo iPhone USB)")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="log più dettagliati (ripetibile)")
@@ -292,6 +345,28 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("clear", help="ripristina la posizione reale").set_defaults(handler=cmd_clear)
 
+    for name, help_text, handler in (
+        ("serve", "avvia API e interfaccia web nel browser", cmd_serve),
+        ("app", "apri l'app in una finestra nativa (pywebview)", cmd_app),
+    ):
+        web_parser = subparsers.add_parser(name, help=help_text)
+        web_parser.add_argument(
+            "--host",
+            default=DEFAULT_HOST,
+            help=f"indirizzo di ascolto (default: {DEFAULT_HOST})",
+        )
+        web_parser.add_argument(
+            "--port",
+            type=int,
+            help=f"porta (default: {DEFAULT_PORT}, o una libera se occupata)",
+        )
+        if name == "serve":
+            web_parser.add_argument("--open", action="store_true", help="apri il browser all'avvio")
+        # uvicorn installa i propri handler di SIGINT/SIGTERM e sovrascrive i
+        # nostri: per `serve` i segnali sono suoi, altrimenti Ctrl-C non arriva
+        # a nessuno dei due.
+        web_parser.set_defaults(handler=handler, owns_signals=True)
+
     return parser
 
 
@@ -308,6 +383,9 @@ async def _run(args: argparse.Namespace) -> int:
     # aspettano e possono ripristinare la posizione reale prima di uscire, senza
     # dover gestire la propagazione di CancelledError.
     args.shutdown = asyncio.Event()
+    if getattr(args, "owns_signals", False):
+        return await args.handler(args)
+
     loop = asyncio.get_running_loop()
     for signal_name in ("SIGINT", "SIGTERM"):
         handled_signal = getattr(signal, signal_name, None)
@@ -323,6 +401,10 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     _configure_logging(args.verbose)
     try:
+        # `app` è sincrono di proposito: pywebview deve stare sul thread
+        # principale, quindi il server gli gira accanto in un thread di servizio.
+        if not asyncio.iscoroutinefunction(args.handler):
+            return args.handler(args)
         return asyncio.run(_run(args))
     except KeyboardInterrupt:
         return EXIT_INTERRUPTED

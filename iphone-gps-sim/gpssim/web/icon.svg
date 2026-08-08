@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Simulatore GPS iPhone">
+  <title>Simulatore GPS iPhone</title>
+  <rect width="64" height="64" rx="14" fill="#0a68d8"/>
+  <!-- Segnaposto: la forma che l'app usa anche sulla mappa. -->
+  <path d="M32 13c-7.2 0-13 5.8-13 13 0 9.5 11.2 21.6 12.1 22.6a1.2 1.2 0 0 0 1.8 0C33.8 47.6 45 35.5 45 26c0-7.2-5.8-13-13-13z"
+        fill="#ffffff"/>
+  <circle cx="32" cy="26" r="5" fill="#0a68d8"/>
+</svg>

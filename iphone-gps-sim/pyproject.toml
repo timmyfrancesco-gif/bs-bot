@@ -10,15 +10,27 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = [
-    # Pin voluto: vedi requirements.txt.
+    # Pin voluti: vedi requirements.txt per il perché.
     "pymobiledevice3==10.4.0",
+    "fastapi==0.120.4",
+    "uvicorn==0.41.0",
+    "httpx==0.28.1",
 ]
+
+[project.optional-dependencies]
+# La finestra nativa è un extra: su un sistema headless pywebview non si installa,
+# ma `gpssim serve` continua a funzionare nel browser.
+desktop = ["pywebview==6.2.1"]
 
 [project.scripts]
 gpssim = "gpssim.cli:main"
 
 [tool.setuptools]
 packages = ["gpssim"]
+
+[tool.setuptools.package-data]
+# Frontend e Leaflet vendorizzato viaggiano col pacchetto (e nel build della fase 4).
+gpssim = ["web/*.html", "web/*.css", "web/*.js", "web/*.svg", "web/vendor/*", "web/vendor/images/*"]
 
 [tool.ruff]
 line-length = 110

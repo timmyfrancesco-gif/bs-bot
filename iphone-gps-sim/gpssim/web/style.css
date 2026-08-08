@@ -1,0 +1,287 @@
+/* Tema chiaro/scuro con variabili: la finestra nativa segue il tema di sistema. */
+:root {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #f0f1f4;
+  --border: #d8dbe0;
+  --text: #1c1f24;
+  --text-dim: #5f6672;
+  --accent: #0a68d8;
+  --accent-text: #ffffff;
+  --danger: #c62828;
+  --danger-dim: #fdecea;
+  --ok: #1b7f4b;
+  --warn: #b26a00;
+  --shadow: 0 4px 20px rgba(15, 20, 30, 0.14);
+  --panel-width: 340px;
+  --statusbar-height: 40px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --surface: #1d2026;
+    --surface-2: #262a31;
+    --border: #343943;
+    --text: #e8eaee;
+    --text-dim: #99a1af;
+    --accent: #4a9bff;
+    --accent-text: #08121f;
+    --danger: #ff6b60;
+    --danger-dim: #3a1f1d;
+    --ok: #56d38a;
+    --warn: #ffb84d;
+    --shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* Una regola d'autore con `display` batte il `display: none` che il browser
+   applica a `[hidden]`: senza questo, `.alert { display: flex }` terrebbe il
+   banner d'errore visibile (e vuoto) per sempre. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+#map {
+  position: absolute;
+  inset: 0 0 var(--statusbar-height) 0;
+  background: var(--surface-2);
+}
+
+/* ------------------------------------------------------------------ pannello */
+
+.panel {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  bottom: calc(var(--statusbar-height) + 12px);
+  width: var(--panel-width);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.panel__header h1 { margin: 0; font-size: 17px; }
+.panel__subtitle { margin: 2px 0 0; color: var(--text-dim); font-size: 12px; }
+.panel__footer { margin: auto 0 0; color: var(--text-dim); font-size: 11.5px; }
+
+.block { display: flex; flex-direction: column; gap: 8px; }
+.block__title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.row { display: flex; gap: 6px; align-items: center; }
+.row--coords { gap: 8px; }
+.row--coords label {
+  flex: 1;
+  /* Senza `min-width: 0` la label non scende sotto la larghezza del suo
+     contenuto e il campo esce dal pannello. */
+  min-width: 0;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.row--coords input { flex: 1; min-width: 0; }
+
+.hint { margin: 0; font-size: 11.5px; color: var(--text-dim); }
+
+input, select {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* ------------------------------------------------------------------- bottoni */
+
+.button {
+  flex: 1;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+}
+.button:hover:not(:disabled) { border-color: var(--accent); }
+.button:disabled { opacity: 0.45; cursor: not-allowed; }
+.button--primary { color: var(--accent-text); background: var(--accent); border-color: transparent; }
+.button--danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+.button--danger:hover:not(:disabled) { background: var(--danger-dim); }
+.button--block { flex: none; width: 100%; }
+.button--icon { flex: none; width: 34px; padding: 8px 0; text-align: center; }
+
+/* ---------------------------------------------------------------- risultati */
+
+.results {
+  margin: 0;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+.results li {
+  padding: 7px 9px;
+  font-size: 12.5px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.results li:last-child { border-bottom: none; }
+.results li:hover { background: var(--accent); color: var(--accent-text); }
+.results li.results__empty { cursor: default; color: var(--text-dim); }
+.results li.results__empty:hover { background: none; color: var(--text-dim); }
+.results small { display: block; color: inherit; opacity: 0.7; }
+
+/* -------------------------------------------------------------------- avviso */
+
+.alert {
+  position: absolute;
+  top: 12px;
+  left: calc(var(--panel-width) + 32px);
+  right: 58px; /* lascia libero il controllo zoom */
+  z-index: 600;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  color: var(--danger);
+  background: var(--surface);
+  border: 1px solid var(--danger);
+  border-left-width: 4px;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.alert__body { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.alert__body span { color: var(--text); font-size: 12.5px; }
+.alert__body code {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.alert .button--icon { color: var(--text-dim); background: none; border: none; font-size: 18px; }
+
+/* --------------------------------------------------------------- barra stato */
+
+.statusbar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 700;
+  height: var(--statusbar-height);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 12px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.statusbar__spacer { flex: 1; }
+.statusbar__message { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.statusbar__item { color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.pill {
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 20px;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.statusbar[data-state="ready"] .pill { background: var(--ok); color: #fff; }
+.statusbar[data-state="simulating"] .pill { background: var(--accent); color: var(--accent-text); }
+.statusbar[data-state="preparing"] .pill { background: var(--warn); color: #fff; }
+.statusbar[data-state="lost"] .pill,
+.statusbar[data-state="error"] .pill { background: var(--danger); color: #fff; }
+
+/* Il badge dice senza ambiguità cosa sta mostrando l'iPhone: è l'informazione
+   più importante dell'interfaccia, perché il resto è solo la nostra intenzione. */
+.badge {
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.badge--simulated { color: var(--accent); border-color: var(--accent); }
+.badge--real { color: var(--ok); border-color: var(--ok); }
+.badge--lost { color: var(--danger); border-color: var(--danger); }
+
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--ok);
+  vertical-align: middle;
+}
+.dot--stale { background: var(--warn); }
+.dot--dead { background: var(--danger); animation: none; }
+.statusbar[data-state="simulating"] .dot { animation: pulse 1.5s ease-in-out infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .statusbar[data-state="simulating"] .dot { animation: none; }
+}
+
+/* ------------------------------------------------------------------- marker */
+
+.marker-active {
+  width: 18px;
+  height: 18px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+.marker-active--lost { background: var(--danger); }
+
+.leaflet-container { background: var(--surface-2); font: inherit; }
+.leaflet-control-attribution { font-size: 10px; }

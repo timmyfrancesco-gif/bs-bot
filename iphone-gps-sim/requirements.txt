@@ -3,3 +3,16 @@
 # stati riorganizzati più volte). La versione è pinnata di proposito: aggiornarla
 # richiede rileggere gpssim/device.py e gpssim/location.py.
 pymobiledevice3==10.4.0
+
+# API locale e interfaccia web.
+fastapi==0.120.4
+uvicorn==0.41.0
+# Le chiamate a Nominatim passano dal nostro processo, per poter impostare uno
+# User-Agent identificativo e rispettarne il rate limit di 1 req/s.
+httpx==0.28.1
+
+# Finestra nativa. È l'unica dipendenza che può non installarsi su un sistema
+# headless (su Linux richiede python3-gi e gir1.2-webkit2-4.1): senza di essa
+# `python -m gpssim app` non parte, ma `python -m gpssim serve` funziona
+# comunque e l'interfaccia si apre nel browser.
+pywebview==6.2.1
