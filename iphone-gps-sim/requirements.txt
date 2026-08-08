@@ -1,0 +1,5 @@
+# L'API di pymobiledevice3 cambia in modo incompatibile tra le major (il modulo
+# è diventato interamente async nella 10.x, e i servizi da sviluppatore sono
+# stati riorganizzati più volte). La versione è pinnata di proposito: aggiornarla
+# richiede rileggere gpssim/device.py e gpssim/location.py.
+pymobiledevice3==10.4.0
