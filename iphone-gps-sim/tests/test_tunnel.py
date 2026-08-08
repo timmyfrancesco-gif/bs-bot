@@ -98,6 +98,22 @@ class RsdTunnelTest(unittest.IsolatedAsyncioTestCase):
             await tunnel.start(timeout=10)
         self.assertEqual(raised.exception.code, ErrorCode.DEVELOPER_MODE_OFF)
 
+    async def test_usbmuxd_assente_riconosciuto_da_stderr(self) -> None:
+        """È il messaggio che `pymobiledevice3` stampa davvero quando il demone
+        USB non risponde: dire «tunnel fallito» manderebbe l'utente a cercare la
+        causa nel posto sbagliato."""
+        script = _fake_tunnel_script(
+            """
+            print("ERROR Failed to connect to usbmuxd socket. Make sure it's running.",
+                  file=sys.stderr, flush=True)
+            sys.exit(1)
+            """
+        )
+        tunnel = RsdTunnel("UDID", base_command=[sys.executable, str(script)])
+        with self.assertRaises(GpsSimError) as raised:
+            await tunnel.start(timeout=10)
+        self.assertEqual(raised.exception.code, ErrorCode.USBMUXD_UNAVAILABLE)
+
     async def test_uscita_senza_tunnel_e_un_errore_tipizzato(self) -> None:
         script = _fake_tunnel_script(
             """

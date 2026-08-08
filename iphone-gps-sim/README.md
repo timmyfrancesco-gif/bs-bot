@@ -6,6 +6,14 @@ sviluppatore di iOS. Alternativa open source a GhostMe.
 > **Stato: fase 2 completata.** Core, API locale e interfaccia con mappa. Restano
 > bookmark/cronologia/GPX (fase 3) e il build con PyInstaller (fase 4).
 
+> **Non è ancora stato provato su un iPhone vero.** È stato sviluppato in un
+> ambiente senza USB, quindi tutto ciò che non tocca il dispositivo è verificato
+> (91 test, l'interfaccia pilotata in un browser reale, le firme di
+> `pymobiledevice3` 10.4.0 controllate una per una, la riga di comando del tunnel
+> eseguita davvero contro il CLI); l'ultimo tratto — mount della DDI, tunnel
+> aperto, coordinate accettate dall'iPhone — no. Se qualcosa non va, parti da
+> `gpssim -vv doctor`: è scritto per dirti dove si rompe.
+
 ## Come funziona
 
 iOS espone un servizio da sviluppatore che sovrascrive la posizione riportata da
@@ -54,31 +62,68 @@ quello che credevi fosse ancora vero.
 Le versioni sono pinnate di proposito (`pymobiledevice3` cambia in modo
 incompatibile tra le major — la 10.x è interamente async).
 
+## Preparazione dell'iPhone
+
+1. Collegalo con un **cavo dati** (non uno da sola ricarica) e **sbloccalo**.
+2. Alla richiesta «Autorizzare questo computer?» tocca **Autorizza** e inserisci
+   il codice.
+3. Attiva **Impostazioni → Privacy e sicurezza → Modalità sviluppatore**, poi
+   **riavvia** l'iPhone e sbloccalo di nuovo.
+   La voce non c'è ancora? È normale: compare solo dopo che uno strumento da
+   sviluppatore ha provato a connettersi. Esegui una volta `gpssim doctor`
+   (sotto), poi ricontrolla le Impostazioni.
+
+Sul computer serve anche il supporto USB per iPhone: su macOS c'è già; su Windows
+installa **Apple Devices** (o iTunes); su Linux servono `usbmuxd` e
+`libimobiledevice` (`sudo apt install usbmuxd libimobiledevice6`).
+
 ## Installazione
 
 ```bash
 cd iphone-gps-sim
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 ```
 
+> **Attenzione a `sudo` e virtualenv.** `sudo` reimposta il `PATH`, quindi
+> `sudo python -m gpssim` userebbe il Python di sistema, dove le dipendenze non
+> ci sono. Usa sempre il percorso completo dell'interprete del venv:
+> `sudo .venv/bin/python -m gpssim …`.
+
 ## Uso
+
+### Prima prova: la diagnostica
+
+Parti sempre da qui. `doctor` percorre tutta la catena e si ferma al primo
+prerequisito mancante, dicendoti cosa fare:
+
+```bash
+sudo .venv/bin/python -m gpssim doctor
+```
+
+Su un iPhone pronto stampa versione, stato della modalità sviluppatore, DDI
+montata, indirizzo e porta del tunnel RSD e il backend scelto. Se qualcosa manca,
+il messaggio dice esattamente cosa (iPhone bloccato, modalità sviluppatore
+disattivata, permessi insufficienti, cavo staccato…).
 
 ### Interfaccia
 
 ```bash
-# Finestra nativa (pywebview)
-sudo python -m gpssim app
+# Finestra nativa
+sudo .venv/bin/python -m gpssim app
 
-# Oppure nel browser, se pywebview non è disponibile
-sudo python -m gpssim serve --open
+# Oppure il server, e la mappa nel browser (consigliato su macOS: evita di far
+# girare una finestra grafica come root)
+sudo .venv/bin/python -m gpssim serve
+# poi apri http://127.0.0.1:8765
 ```
 
-Nella finestra: scegli l'iPhone e premi **Connetti** (è il passo lento — monta la
-DDI e apre il tunnel), poi cerca un indirizzo o clicca sulla mappa e premi
-**Applica posizione all'iPhone**. **Ripristina posizione reale** annulla
-l'override lasciando la sessione aperta. Chiudendo l'app la posizione reale viene
-ripristinata comunque.
+Nella finestra: scegli l'iPhone e premi **Connetti** — è il passo lento, monta la
+DDI e apre il tunnel, e la prima volta scarica la Developer Disk Image (serve
+internet). Poi cerca un indirizzo o clicca sulla mappa e premi **Applica
+posizione all'iPhone**. **Ripristina posizione reale** annulla l'override
+lasciando la sessione aperta; chiudendo l'app la posizione reale viene comunque
+ripristinata.
 
 La barra di stato in basso dice sempre tre cose: in che stato è la sessione, cosa
 sta *effettivamente* mostrando l'iPhone, e se il keep-alive sta ancora girando.
@@ -86,12 +131,11 @@ sta *effettivamente* mostrando l'iPhone, e se il keep-alive sta ancora girando.
 ### Riga di comando
 
 ```bash
-python -m gpssim devices            # quali iPhone vedo
-python -m gpssim doctor             # diagnostica: privilegi, dev mode, DDI, tunnel, backend
-sudo python -m gpssim tunnel        # solo il tunnel: stampa indirizzo e porta RSD
-sudo python -m gpssim set 45.4642 9.1900          # simula e mantieni
-sudo python -m gpssim set 45.4642 9.1900 --hold 30
-sudo python -m gpssim clear         # ripristina la posizione reale
+.venv/bin/python -m gpssim devices                       # quali iPhone vedo
+sudo .venv/bin/python -m gpssim tunnel                   # solo il tunnel: indirizzo e porta RSD
+sudo .venv/bin/python -m gpssim set 45.4642 9.1900       # simula e mantieni (Ctrl-C per uscire)
+sudo .venv/bin/python -m gpssim set 45.4642 9.1900 --hold 30
+sudo .venv/bin/python -m gpssim clear                    # ripristina la posizione reale
 ```
 
 Opzioni utili: `--udid` per scegliere il dispositivo, `-v`/`-vv` per i log,
@@ -99,8 +143,19 @@ Opzioni utili: `--udid` per scegliere il dispositivo, `-v`/`-vv` per i log,
 disattivare la riconnessione automatica, `--no-sudo` per fallire subito invece di
 tentare l'elevazione.
 
-Su macOS e Linux, se il processo non è già root, il tunnel viene avviato con
-`sudo -n` (mai un prompt invisibile): se serve la password, l'errore lo dice.
+### Perché `sudo`
+
+Solo il tunnel RSD di iOS 17+ ne ha bisogno: crea un'interfaccia di rete. Se il
+processo non è già root, il tunnel viene avviato con `sudo -n`, cioè senza mai
+aprire un prompt che nella finestra dell'app non vedresti; se la password serve,
+l'errore lo dice invece di restare appeso. Le due vie che funzionano:
+
+- lanciare tutto con `sudo` (come sopra), oppure
+- fare prima `sudo -v` per sbloccare la password, poi lanciare l'app da utente
+  normale — vale finché non scade il timeout di `sudo` (~5 minuti).
+
+Su **Windows** `sudo` non esiste: apri il terminale con «Esegui come
+amministratore». Su iOS 16 e precedenti il tunnel non serve e `sudo` nemmeno.
 
 ## Architettura
 

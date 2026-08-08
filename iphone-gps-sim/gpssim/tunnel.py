@@ -294,6 +294,10 @@ class RsdTunnel:
             )
         if "no module named pymobiledevice3" in blob:
             return GpsSimError(ErrorCode.PYMOBILEDEVICE3_MISSING, detail=self.stderr_tail)
+        if "usbmuxd" in blob:
+            # Va prima dei controlli sul dispositivo: senza usbmuxd non sappiamo
+            # nemmeno se un iPhone è collegato, e la cosa da sistemare è un'altra.
+            return GpsSimError(ErrorCode.USBMUXD_UNAVAILABLE, detail=self.stderr_tail)
         if "developer mode" in blob:
             return GpsSimError(ErrorCode.DEVELOPER_MODE_OFF, detail=self.stderr_tail)
         if "passcode" in blob or "password" in blob or "unlock" in blob:
