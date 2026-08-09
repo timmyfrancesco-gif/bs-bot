@@ -267,9 +267,16 @@ Il giro città usa il server pubblico di demo di **OSRM**
 (`router.project-osrm.org`), gratuito e senza chiave, ma condiviso e non
 pensato per un uso pesante — non ha il rate limit esplicito di Nominatim, ma
 non va bombardato di richieste. Per un uso serio, o per città enormi che il
-demo rifiuta, punta un'istanza propria con `GPSSIM_ROUTER_URL`. Il tetto di 50
-tappe per giro (`gpssim.routing.MAX_WAYPOINTS`) esiste apposta perché il
-servizio pubblico non calcolerebbe in tempo utile un tour con troppe fermate.
+demo rifiuta, punta un'istanza propria con `GPSSIM_ROUTER_URL`.
+
+Il tetto di 15 tappe per giro (`gpssim.routing.MAX_WAYPOINTS`) esiste apposta:
+`/trip` risolve un problema del commesso viaggiatore, il cui costo cresce
+rapidissimo con le tappe, e il server pubblico rifiuta (`HTTP 400`) le
+richieste troppo pesanti prima ancora di provarci. Su un'istanza propria il
+tetto si può alzare parecchio. Se compare comunque un «Il motore di routing ha
+risposto 400», il messaggio d'errore ora porta il corpo della risposta di OSRM
+nel dettaglio: aiuta a capire se la causa è davvero il numero di tappe o
+qualcos'altro.
 
 ### Errori gestiti
 

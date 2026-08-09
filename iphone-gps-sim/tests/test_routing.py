@@ -101,7 +101,7 @@ class SampleGridPointsTest(unittest.TestCase):
 class SuggestWaypointCountTest(unittest.TestCase):
     def test_una_citta_piccola_ha_poche_tappe(self) -> None:
         small = BoundingBox(south=44.14, north=44.15, west=12.24, east=12.25)
-        self.assertLess(suggest_waypoint_count(small), 15)
+        self.assertLess(suggest_waypoint_count(small), MAX_WAYPOINTS)
 
     def test_una_metropoli_e_limitata_dal_tetto(self) -> None:
         huge = BoundingBox(south=41.7, north=42.0, west=12.3, east=12.7)  # ~ area di Roma
@@ -165,6 +165,30 @@ class RouterTripTest(unittest.IsolatedAsyncioTestCase):
         router = Router(endpoint="https://osrm.test", client=_client(handler))
         with self.assertRaises(RouteError):
             await router.trip([MILANO, MILANO_NORD])
+
+    async def test_400_porta_il_corpo_della_risposta_nel_dettaglio(self) -> None:
+        """Un 400 diretto (non un `code` logico nel corpo) è quasi sempre il
+        servizio pubblico che rifiuta la richiesta a monte — il corpo della
+        risposta è la sola diagnosi disponibile, va sempre nel dettaglio."""
+
+        def handler(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(400, json={"code": "TooBig", "message": "Too many waypoints"})
+
+        router = Router(endpoint="https://osrm.test", client=_client(handler))
+        with self.assertRaises(RouteError) as raised:
+            await router.trip([MILANO, MILANO_NORD])
+        self.assertIn("Too many waypoints", raised.exception.detail)
+        self.assertIn("400", raised.exception.detail)
+        self.assertIn("tappe", raised.exception.hint)
+
+    async def test_400_con_corpo_non_json_usa_il_testo_grezzo(self) -> None:
+        def handler(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(400, text="<html>Bad Request</html>")
+
+        router = Router(endpoint="https://osrm.test", client=_client(handler))
+        with self.assertRaises(RouteError) as raised:
+            await router.trip([MILANO, MILANO_NORD])
+        self.assertIn("Bad Request", raised.exception.detail)
 
     async def test_timeout(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:

@@ -60,9 +60,13 @@ _MIN_BBOX_SPAN_DEG = 0.01  # ~1,1 km in latitudine
 #: Quanto allarghiamo un riquadro degenere.
 _FALLBACK_HALF_SPAN_DEG = 0.015  # ~1,7 km per lato
 
-#: Limite di punti da chiedere a OSRM: il server pubblico di demo rifiuta (o
-#: rallenta parecchio) richieste `/trip` con troppe tappe.
-MAX_WAYPOINTS = 50
+#: Limite di punti da chiedere a OSRM. `/trip` risolve un problema del
+#: commesso viaggiatore: il costo cresce rapidissimo con le tappe, e il server
+#: pubblico di demo rifiuta (400) o rallenta parecchio ben prima che il costo
+#: diventi proibitivo per un uso serio. Un tetto basso qui non è un limite
+#: nostro — è il prezzo di usare un servizio condiviso e gratuito; un'istanza
+#: propria (`GPSSIM_ROUTER_URL`) può reggerne molte di più.
+MAX_WAYPOINTS = 15
 
 
 class RouteError(Exception):
@@ -72,13 +76,16 @@ class RouteError(Exception):
     ha una gerarchia separata, come `GeocodingError`.
     """
 
-    def __init__(self, message: str, *, hint: str | None = None) -> None:
+    def __init__(self, message: str, *, hint: str | None = None, detail: str | None = None) -> None:
         super().__init__(message)
         self.message = message
         self.hint = hint or "Riprova, oppure scegli una città diversa."
+        #: Testo tecnico (es. il corpo della risposta HTTP): non nel messaggio
+        #: principale, ma disponibile nel pannello «dettagli» della UI.
+        self.detail = detail
 
     def to_dict(self) -> dict[str, Any]:
-        return {"code": "route_failed", "message": self.message, "hint": self.hint}
+        return {"code": "route_failed", "message": self.message, "hint": self.hint, "detail": self.detail}
 
 
 @dataclass(frozen=True)
@@ -95,6 +102,23 @@ class RoutePlan:
             "points": [point.to_dict() for point in self.points],
             "distance_m": self.distance_m,
         }
+
+
+def _extract_error_detail(response: Any, limit: int = 300) -> str:
+    """Il dettaglio tecnico da mettere in `RouteError.detail`: preferisce il
+    campo `message` se OSRM ha risposto con JSON, altrimenti il testo grezzo
+    (troncato — può essere una pagina HTML di un livello intermedio)."""
+    try:
+        payload = response.json()
+    except ValueError:
+        pass
+    else:
+        if isinstance(payload, dict) and payload.get("message"):
+            return f"HTTP {response.status_code}: {payload['message']}"
+    text = (response.text or "").strip()
+    if len(text) > limit:
+        text = text[:limit] + "…"
+    return f"HTTP {response.status_code}: {text}" if text else f"HTTP {response.status_code}"
 
 
 class Router:
@@ -154,12 +178,28 @@ class Router:
                 "Il motore di routing non ha risposto in tempo.",
                 hint="La città potrebbe essere troppo estesa per il servizio pubblico di demo. Riprova, "
                 "o scegli un'area più piccola.",
+                detail=f"{type(exc).__name__}: {exc}",
             ) from exc
         except httpx.HTTPError as exc:
-            raise RouteError("Non riesco a contattare il motore di routing.") from exc
+            raise RouteError(
+                "Non riesco a contattare il motore di routing.",
+                detail=f"{type(exc).__name__}: {exc}",
+            ) from exc
 
         if response.status_code >= 400:
-            raise RouteError(f"Il motore di routing ha risposto {response.status_code}.")
+            # OSRM a volte spiega il rifiuto in un corpo JSON anche con uno
+            # stato HTTP di errore; altre volte (limiti imposti a monte, non
+            # da OSRM stesso) il corpo è testo semplice o una pagina. In
+            # entrambi i casi vale la pena mostrarlo: è la sola diagnosi che
+            # abbiamo per un servizio che non controlliamo.
+            detail = _extract_error_detail(response)
+            raise RouteError(
+                f"Il motore di routing ha risposto {response.status_code}.",
+                hint=f"Con {len(waypoints)} tappe, è probabile che il servizio pubblico di demo abbia "
+                "rifiutato la richiesta perché troppo pesante da calcolare. Riduci il numero di "
+                "tappe (campo «Tappe») o scegli un'area più piccola, poi riprova.",
+                detail=detail,
+            )
 
         try:
             payload = response.json()
@@ -173,6 +213,7 @@ class Router:
                 "Non è stato possibile costruire un giro che tocchi tutta l'area scelta.",
                 hint="Succede se la città è troppo frammentata (isole, zone non connesse via strada). "
                 "Prova un'altra città o un'area più piccola.",
+                detail=f"code={code} message={payload.get('message')}",
             )
 
         trips = payload.get("trips") or []
