@@ -418,6 +418,14 @@ class ApiTest(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 200, path)
 
+    def test_il_frontend_non_viene_mai_tenuto_in_cache(self) -> None:
+        """Un `app.js` in cache è il modo più subdolo per far sembrare rotto un
+        aggiornamento appena installato: nessuna risposta va tenuta in cache,
+        non solo quelle dell'API."""
+        for path in ("/", "/app.js", "/style.css", "/api/status", "/api/health"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).headers.get("cache-control"), "no-store", path)
+
     def test_lo_shutdown_ripristina_la_posizione_reale(self) -> None:
         """Chiudere l'app senza ripristinare lascerebbe l'iPhone con una posizione
         falsa e nessuna interfaccia per annullarla."""

@@ -127,6 +127,17 @@ def create_app(
     app.state.geocoder = geocoder
     app.state.router = router
 
+    @app.middleware("http")
+    async def _no_cache(request: Request, call_next: Any) -> Any:
+        """Il frontend (`app.js`, `index.html`, ecc.) non deve mai restare in
+        cache: ogni `git pull` deve arrivare al browser al prossimo refresh,
+        non a un refresh forzato di cui l'utente deve ricordarsi. Questa non è
+        un'API pubblica ad alto traffico — non costa nulla disattivare la
+        cache ovunque."""
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     # ------------------------------------------------------------------ #
     # Errori
     # ------------------------------------------------------------------ #

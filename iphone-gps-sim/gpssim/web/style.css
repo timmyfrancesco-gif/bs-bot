@@ -167,6 +167,25 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
 .results li.results__empty:hover { background: none; color: var(--text-dim); }
 .results small { display: block; color: inherit; opacity: 0.7; }
 
+/* -------------------------------------------------------------------- versione */
+
+/* Sotto il controllo zoom (che occupa l'angolo in alto a destra), non sopra:
+   altrimenti coprirebbe i pulsanti + / -. */
+.app-version {
+  position: absolute;
+  top: 78px;
+  right: 12px;
+  z-index: 550;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+}
+
 /* -------------------------------------------------------------------- avviso */
 
 .alert {

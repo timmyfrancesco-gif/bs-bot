@@ -550,6 +550,7 @@ function cacheElements() {
     tourSearchButton: 'tour-search-button', tourResults: 'tour-results',
     tourSpeed: 'tour-speed', tourWaypoints: 'tour-waypoints', tourPlanButton: 'tour-plan',
     tourStats: 'tour-stats', tourPlay: 'tour-play', tourStop: 'tour-stop',
+    appVersion: 'app-version',
   };
   for (const [key, id] of Object.entries(ids)) {
     el[key] = document.getElementById(id);
@@ -627,11 +628,23 @@ function bindEvents() {
   }
 }
 
+/** Mostrata in alto a destra: utile a occhio per confermare che il browser
+ *  stia caricando la versione dell'app appena aggiornata e non una cache. */
+async function loadVersion() {
+  try {
+    const payload = await api('/api/health');
+    el.appVersion.textContent = `v${payload.version}`;
+  } catch {
+    el.appVersion.textContent = '';
+  }
+}
+
 async function main() {
   cacheElements();
   initMap();
   bindEvents();
   refreshControls();
+  loadVersion();
 
   keepaliveTimer = setInterval(renderKeepalive, 500);
   window.addEventListener('beforeunload', () => clearInterval(keepaliveTimer));
