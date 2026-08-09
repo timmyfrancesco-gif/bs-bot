@@ -64,8 +64,24 @@ class ConnectRequest(BaseModel):
     udid: str | None = None
 
 
+class BoundingBoxRequest(BaseModel):
+    south: float = Field(ge=-90.0, le=90.0)
+    north: float = Field(ge=-90.0, le=90.0)
+    west: float = Field(ge=-180.0, le=180.0)
+    east: float = Field(ge=-180.0, le=180.0)
+
+
 class CityTourRequest(BaseModel):
-    city: str = Field(min_length=1, max_length=200)
+    """Il luogo è già risolto lato frontend (scelto da un elenco di risultati
+    di `/api/geocode/search`): qui non si geocodifica più un nome libero, per
+    evitare che un secondo giro di ricerca interna scelga un posto diverso da
+    quello che l'utente ha effettivamente selezionato."""
+
+    label: str = Field(min_length=1, max_length=200)
+    latitude: float = Field(ge=-90.0, le=90.0)
+    longitude: float = Field(ge=-180.0, le=180.0)
+    #: Assente per risultati non areali: si allarga un riquadro attorno al punto.
+    bbox: BoundingBoxRequest | None = None
     speed_kmh: float = Field(default=50.0, gt=0, le=200)
     profile: str = Field(default="driving", pattern="^(driving|cycling|walking)$")
     #: `None` lascia decidere in base all'estensione della città.
@@ -183,32 +199,29 @@ def create_app(
     # ------------------------------------------------------------------ #
 
     @app.post("/api/routes/plan")
-    async def plan_route(payload: CityTourRequest) -> Any:
-        """Pianifica (senza avviare) un giro che copre l'area della città data.
+    async def plan_route(payload: CityTourRequest) -> dict[str, Any]:
+        """Pianifica (senza avviare) un giro che copre l'area del luogo scelto.
 
         Non è "ogni singola strada": campiona l'area con più tappe quanto più
-        la città è estesa e chiede al motore di routing il giro di andata e
+        il luogo è esteso e chiede al motore di routing il giro di andata e
         ritorno più efficiente che le tocchi tutte, su strade vere.
         """
-        places = await geocoder.search(payload.city, limit=1)
-        if not places:
-            return JSONResponse(
-                status_code=404,
-                content={
-                    "error": {
-                        "code": "city_not_found",
-                        "message": f"Nessun risultato per «{payload.city}».",
-                        "hint": "Controlla il nome e riprova — anche solo il nome della città basta.",
-                    }
-                },
+        origin = Coordinate(payload.latitude, payload.longitude)
+        bbox = (
+            BoundingBox(
+                south=payload.bbox.south,
+                north=payload.bbox.north,
+                west=payload.bbox.west,
+                east=payload.bbox.east,
             )
-        place = places[0]
-        bbox = place.bbox or BoundingBox.around(place.coordinate, 0.02)
-        label = f"Giro di {place.label.split(',')[0].strip()}"
+            if payload.bbox is not None
+            else BoundingBox.around(origin, 0.02)
+        )
+        label = f"Giro di {payload.label.split(',')[0].strip()}"
         plan = await compute_city_tour(
             router,
             bbox=bbox,
-            origin=place.coordinate,
+            origin=origin,
             label=label,
             waypoint_count=payload.waypoints,
             profile=payload.profile,

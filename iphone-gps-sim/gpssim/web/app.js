@@ -33,6 +33,7 @@ const state = {
   selectionLabel: null,
   devices: [],
   searchToken: 0,
+  tourOrigin: null,      // luogo scelto dall'elenco: {label, latitude, longitude, bbox}
   tourPlan: null,        // {label, points, distance_m, speed_kmh} — dall'ultimo /api/routes/plan
 };
 
@@ -143,27 +144,29 @@ function readInputs() {
 
 // ---------------------------------------------------------------------- ricerca
 
-async function runSearch() {
-  const query = el.searchInput.value.trim();
+/** Cerca su Nominatim e mostra i risultati in `listEl`; `onSelect` decide cosa
+ *  fare del luogo scelto — usata sia dalla ricerca indirizzi sia dal giro città,
+ *  che vogliono lo stesso comportamento ma reagiscono in modo diverso al click. */
+async function searchPlaces(query, listEl, onSelect) {
   if (!query) {
-    el.searchResults.hidden = true;
+    listEl.hidden = true;
     return;
   }
-  el.searchResults.hidden = false;
-  el.searchResults.innerHTML = '<li class="results__empty">Cerco…</li>';
+  listEl.hidden = false;
+  listEl.innerHTML = '<li class="results__empty">Cerco…</li>';
   try {
     const payload = await api(`/api/geocode/search?q=${encodeURIComponent(query)}`);
-    renderResults(payload.results || []);
+    renderPlaceResults(listEl, payload.results || [], onSelect);
   } catch (error) {
-    el.searchResults.innerHTML = '<li class="results__empty">Ricerca non disponibile.</li>';
+    listEl.innerHTML = '<li class="results__empty">Ricerca non disponibile.</li>';
     showError(error);
   }
 }
 
-function renderResults(results) {
-  el.searchResults.innerHTML = '';
+function renderPlaceResults(listEl, results, onSelect) {
+  listEl.innerHTML = '';
   if (results.length === 0) {
-    el.searchResults.innerHTML = '<li class="results__empty">Nessun risultato.</li>';
+    listEl.innerHTML = '<li class="results__empty">Nessun risultato.</li>';
     return;
   }
   for (const place of results) {
@@ -175,13 +178,17 @@ function renderResults(results) {
       small.textContent = rest.join(', ');
       item.appendChild(small);
     }
-    item.addEventListener('click', () => {
-      setSelection({ latitude: place.latitude, longitude: place.longitude }, place.label);
-      map.setView([place.latitude, place.longitude], PLACE_ZOOM);
-      el.searchResults.hidden = true;
-    });
-    el.searchResults.appendChild(item);
+    item.addEventListener('click', () => onSelect(place));
+    listEl.appendChild(item);
   }
+}
+
+function runSearch() {
+  return searchPlaces(el.searchInput.value.trim(), el.searchResults, (place) => {
+    setSelection({ latitude: place.latitude, longitude: place.longitude }, place.label);
+    map.setView([place.latitude, place.longitude], PLACE_ZOOM);
+    el.searchResults.hidden = true;
+  });
 }
 
 // ------------------------------------------------------------------ dispositivi
@@ -289,16 +296,29 @@ function restoreReal() {
 
 // ---------------------------------------------------------------------- giro città
 
-/** Chiede il giro completo della città al server (geocodifica + routing reale),
- *  lo disegna sulla mappa, ma non lo avvia: quello è un passo separato. */
+function runTourSearch() {
+  return searchPlaces(el.tourCity.value.trim(), el.tourResults, (place) => {
+    state.tourOrigin = place;
+    el.tourCity.value = place.label;
+    el.tourResults.hidden = true;
+    refreshControls();
+  });
+}
+
+/** Chiede il giro completo del luogo scelto (routing reale), lo disegna sulla
+ *  mappa, ma non lo avvia: quello è un passo separato. Il luogo deve venire
+ *  dall'elenco di ricerca — un nome libero potrebbe corrispondere a più posti,
+ *  e qui non c'è modo di far scegliere quale dopo il fatto. */
 function planTour() {
   return withBusy(el.tourPlanButton, async () => {
-    const city = el.tourCity.value.trim();
-    if (!city) throw { message: 'Scrivi il nome di una città.', hint: '' };
+    if (!state.tourOrigin) throw { message: 'Cerca una città e scegli un risultato dall\'elenco.', hint: '' };
 
     const waypoints = el.tourWaypoints.value ? Number.parseInt(el.tourWaypoints.value, 10) : null;
     const body = {
-      city,
+      label: state.tourOrigin.label,
+      latitude: state.tourOrigin.latitude,
+      longitude: state.tourOrigin.longitude,
+      bbox: state.tourOrigin.bbox,
       speed_kmh: Number.parseFloat(el.tourSpeed.value) || 50,
       waypoints,
     };
@@ -491,7 +511,7 @@ function refreshControls() {
   const routePlaying = Boolean(route && route.playing);
   el.tourPlay.hidden = routePlaying;
   el.tourStop.hidden = !routePlaying;
-  el.tourPlanButton.disabled = !connected || busy || routePlaying;
+  el.tourPlanButton.disabled = !connected || busy || routePlaying || !state.tourOrigin;
   el.tourPlay.disabled = !connected || busy || !state.tourPlan || routePlaying;
   el.tourStop.disabled = busy;
 }
@@ -527,6 +547,7 @@ function cacheElements() {
     statePill: 'state-pill', locationBadge: 'location-badge', statusMessage: 'status-message',
     keepalive: 'keepalive', keepaliveText: 'keepalive-text', tunnelInfo: 'tunnel-info',
     backendInfo: 'backend-info', routeInfo: 'route-info', tourCity: 'tour-city',
+    tourSearchButton: 'tour-search-button', tourResults: 'tour-results',
     tourSpeed: 'tour-speed', tourWaypoints: 'tour-waypoints', tourPlanButton: 'tour-plan',
     tourStats: 'tour-stats', tourPlay: 'tour-play', tourStop: 'tour-stop',
   };
@@ -564,11 +585,22 @@ function bindEvents() {
   el.tourPlanButton.addEventListener('click', planTour);
   el.tourPlay.addEventListener('click', playTour);
   el.tourStop.addEventListener('click', stopTour);
+  el.tourSearchButton.addEventListener('click', runTourSearch);
   el.tourCity.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
-      planTour();
+      runTourSearch();
+    } else if (event.key === 'Escape') {
+      el.tourResults.hidden = true;
     }
+  });
+  // Modificare il testo dopo una scelta invalida quella scelta: altrimenti
+  // "Genera il giro" resterebbe attivo puntando a un luogo che non è più
+  // quello scritto nel campo.
+  el.tourCity.addEventListener('input', () => {
+    state.tourOrigin = null;
+    el.tourResults.hidden = true;
+    refreshControls();
   });
 
   el.searchButton.addEventListener('click', runSearch);

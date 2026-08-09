@@ -64,12 +64,15 @@
       <div class="row">
         <input id="tour-city" type="text" placeholder="Cesena, Cervia, Roma…"
                autocomplete="off" aria-label="Città per il giro">
+        <button id="tour-search-button" class="button button--icon" title="Cerca">&#9906;</button>
       </div>
+      <ul id="tour-results" class="results" hidden></ul>
+      <p class="hint">Scrivi il nome e premi cerca, poi scegli il risultato giusto dall'elenco.</p>
       <div class="row row--coords">
         <label>km/h <input id="tour-speed" type="number" min="1" max="200" step="1" value="50"></label>
         <label>Tappe <input id="tour-waypoints" type="number" min="2" max="50" step="1" placeholder="auto"></label>
       </div>
-      <button id="tour-plan" class="button button--block">Genera il giro</button>
+      <button id="tour-plan" class="button button--block" disabled>Genera il giro</button>
       <p id="tour-stats" class="hint"></p>
       <div class="row">
         <button id="tour-play" class="button button--primary" disabled>Avvia il giro</button>

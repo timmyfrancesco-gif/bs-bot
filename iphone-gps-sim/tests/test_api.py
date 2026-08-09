@@ -228,9 +228,20 @@ class ApiTest(unittest.TestCase):
     # Giro città
     # ------------------------------------------------------------------ #
 
-    def test_plan_route_pianifica_un_giro_per_la_citta(self) -> None:
+    #: Un luogo già risolto, come lo manda il frontend dopo che l'utente ha
+    #: scelto un risultato dall'elenco di `/api/geocode/search` — l'endpoint di
+    #: pianificazione non geocodifica più nulla da sé, apposta: un secondo giro
+    #: di ricerca interna potrebbe risolvere un posto diverso da quello scelto.
+    MILANO_PLACE = {
+        "label": "Milano, Lombardia, Italia",
+        "latitude": MILANO.latitude,
+        "longitude": MILANO.longitude,
+        "bbox": {"south": 45.39, "north": 45.53, "west": 9.04, "east": 9.27},
+    }
+
+    def test_plan_route_pianifica_un_giro_per_il_luogo_scelto(self) -> None:
         response = self.client.post(
-            "/api/routes/plan", json={"city": "Milano", "speed_kmh": 40, "waypoints": 5}
+            "/api/routes/plan", json={**self.MILANO_PLACE, "speed_kmh": 40, "waypoints": 5}
         )
         self.assertEqual(response.status_code, 200)
         payload = response.json()
@@ -240,39 +251,41 @@ class ApiTest(unittest.TestCase):
         self.assertGreater(len(payload["points"]), 2, "la geometria grezza andava infittita")
         self.assertGreater(payload["distance_m"], 0)
 
-        # La prima tappa mandata al router deve essere l'origine geocodificata.
+        # La prima tappa mandata al router deve essere il luogo scelto, non un
+        # nuovo risultato di geocodifica.
         waypoints, profile = self.router.calls[0]
         self.assertEqual(waypoints[0], MILANO)
         self.assertEqual(profile, "driving")
         self.assertEqual(len(waypoints), 5)
+        self.assertEqual(self.geocoder.searches, [], "non deve geocodificare di nuovo")
 
     def test_plan_route_rispetta_il_profilo_richiesto(self) -> None:
-        self.client.post("/api/routes/plan", json={"city": "Milano", "profile": "walking"})
+        self.client.post("/api/routes/plan", json={**self.MILANO_PLACE, "profile": "walking"})
         _waypoints, profile = self.router.calls[0]
         self.assertEqual(profile, "walking")
 
     def test_plan_route_profilo_non_valido_e_rifiutato_dalla_validazione(self) -> None:
-        response = self.client.post("/api/routes/plan", json={"city": "Milano", "profile": "volo"})
+        response = self.client.post("/api/routes/plan", json={**self.MILANO_PLACE, "profile": "volo"})
         self.assertEqual(response.status_code, 422)
 
     def test_plan_route_senza_riquadro_usa_un_fallback_attorno_al_punto(self) -> None:
         """Non tutti i risultati di Nominatim hanno un `boundingbox`: senza,
         il giro deve comunque uscire da un singolo punto ripetuto."""
-        self.geocoder.with_bbox = False
-        response = self.client.post("/api/routes/plan", json={"city": "Milano"})
+        place = {**self.MILANO_PLACE, "bbox": None}
+        response = self.client.post("/api/routes/plan", json=place)
         self.assertEqual(response.status_code, 200)
         waypoints, _profile = self.router.calls[0]
         # Più di una tappa distinta: il riquadro sintetico non è degenere.
         self.assertGreater(len({(w.latitude, w.longitude) for w in waypoints}), 1)
 
-    def test_plan_route_citta_non_trovata_e_404(self) -> None:
-        response = self.client.post("/api/routes/plan", json={"city": "città-inesistente"})
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["error"]["code"], "city_not_found")
+    def test_plan_route_coordinate_fuori_range_rifiutate_dalla_validazione(self) -> None:
+        place = {**self.MILANO_PLACE, "latitude": 999}
+        response = self.client.post("/api/routes/plan", json=place)
+        self.assertEqual(response.status_code, 422)
 
     def test_plan_route_router_fallito_e_502(self) -> None:
         self.router.fail_with = RouteError("il motore di routing non risponde")
-        response = self.client.post("/api/routes/plan", json={"city": "Milano"})
+        response = self.client.post("/api/routes/plan", json=self.MILANO_PLACE)
         self.assertEqual(response.status_code, 502)
         self.assertEqual(response.json()["error"]["code"], "route_failed")
 

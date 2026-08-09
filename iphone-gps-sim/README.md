@@ -152,13 +152,15 @@ ripristinata.
 La barra di stato in basso dice sempre tre cose: in che stato è la sessione, cosa
 sta *effettivamente* mostrando l'iPhone, e se il keep-alive sta ancora girando.
 
-Nel pannello **Giro città**: scrivi il nome di una città, imposta la velocità
-(km/h) e premi **Genera il giro** — traccia il percorso sulla mappa e mostra
-distanza e tempo stimato, senza ancora muovere nulla. Premi **Avvia il giro**
-per farlo partire davvero; **Ferma il giro** lo interrompe dov'è (per tornare
-alla posizione reale c'è sempre «Ripristina posizione reale»). Il campo
-«Tappe» è opzionale: lasciandolo vuoto l'app sceglie da sola in base
-all'estensione della città.
+Nel pannello **Giro città**: scrivi il nome di una città e premi l'icona di
+ricerca (o Invio) — compare un elenco di corrispondenze, come nella ricerca
+indirizzi, per scegliere quella giusta quando il nome è ambiguo. Scelto il
+risultato, imposta la velocità (km/h) e premi **Genera il giro** — traccia il
+percorso sulla mappa e mostra distanza e tempo stimato, senza ancora muovere
+nulla. Premi **Avvia il giro** per farlo partire davvero; **Ferma il giro** lo
+interrompe dov'è (per tornare alla posizione reale c'è sempre «Ripristina
+posizione reale»). Il campo «Tappe» è opzionale: lasciandolo vuoto l'app
+sceglie da sola in base all'estensione della città.
 
 ### Riga di comando
 
@@ -236,7 +238,7 @@ deve mai ricomporlo da risposte diverse.
 | `GET /api/events` | stream SSE dello stato |
 | `GET /api/geocode/search?q=` | ricerca indirizzi |
 | `GET /api/geocode/reverse?latitude=&longitude=` | nome del luogo alle coordinate |
-| `POST /api/routes/plan` | pianifica il giro di una città (`{city, speed_kmh, profile, waypoints}`), non lo avvia |
+| `POST /api/routes/plan` | pianifica il giro di un luogo già geocodificato (`{label, latitude, longitude, bbox, speed_kmh, profile, waypoints}`), non lo avvia |
 | `POST /api/routes/play` | avvia il playback di un giro (`{points, speed_kmh, label}`) |
 | `POST /api/routes/stop` | ferma il giro dov'è |
 

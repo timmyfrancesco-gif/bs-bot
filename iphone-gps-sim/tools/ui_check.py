@@ -230,7 +230,16 @@ async def run(headed: bool, screenshots: Path | None, chromium: Path | None) -> 
 
         # ------------------------------------------------------------ giro città
         print("\ngiro città")
-        await page.fill("#tour-city", "Milano")
+        checker.check(
+            "«Genera il giro» è disabilitato senza un luogo scelto", not await enabled("#tour-plan")
+        )
+
+        await page.fill("#tour-city", "milano")
+        await page.click("#tour-search-button")
+        await page.wait_for_selector("#tour-results li:not(.results__empty)")
+        await page.locator("#tour-results li:not(.results__empty)").first.click()
+        checker.check("scegliere un risultato abilita «Genera il giro»", await enabled("#tour-plan"))
+
         await page.click("#tour-plan")
         await page.wait_for_function(
             "document.querySelector('#tour-stats').textContent.includes('km')", timeout=8000
