@@ -35,7 +35,8 @@ from typing import Any
 
 from .device import DeviceConnection, DeviceManager, ProgressCallback, noop_progress
 from .errors import ErrorCode, GpsSimError, classify
-from .models import KEEPALIVE_INTERVAL, Coordinate, SessionState, Status
+from .models import KEEPALIVE_INTERVAL, Coordinate, RouteProgress, SessionState, Status
+from .routing import haversine_m, total_distance_m
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +246,7 @@ class LocationSession:
         self._backend: LocationBackend | None = None
         self._keepalive: asyncio.Task[None] | None = None
         self._recovery: asyncio.Task[None] | None = None
+        self._route_task: asyncio.Task[None] | None = None
         self._listeners: list[StatusListener] = []
         self._lock = asyncio.Lock()
 
@@ -359,20 +361,14 @@ class LocationSession:
     # ------------------------------------------------------------------ #
 
     async def set_location(self, coordinate: Coordinate) -> Status:
-        """Imposta la posizione e avvia (o aggiorna) il keep-alive."""
-        async with self._lock:
-            backend = self._require_backend()
-            try:
-                await backend.set(coordinate)
-            except Exception as exc:
-                error = classify(exc, default=ErrorCode.LOCATION_PUSH_FAILED)
-                self._mark_lost(error)
-                raise error from exc
+        """Imposta la posizione e avvia (o aggiorna) il keep-alive.
 
-            self.status.target = coordinate
-            self.status.last_push_at = time.time()
-            self.status.last_push_ok = True
-            self.status.consecutive_push_failures = 0
+        Interrompe un giro città in corso: impostare un punto a mano è
+        un'azione esplicita dell'utente, deve vincere su qualunque automatismo.
+        """
+        async with self._lock:
+            await self._stop_route()
+            await self._push_target(coordinate)
             self._set_state(
                 SessionState.SIMULATING,
                 message=f"Posizione simulata: {coordinate.latitude:.6f}, {coordinate.longitude:.6f}",
@@ -385,6 +381,7 @@ class LocationSession:
         """Il pulsante «ripristina posizione reale»: ferma il keep-alive e azzera
         l'override, lasciando la sessione pronta per un nuovo punto."""
         async with self._lock:
+            await self._stop_route()
             await self._clear_location(best_effort=False)
             self.status.target = None
             self._set_state(
@@ -393,6 +390,103 @@ class LocationSession:
                 real_location=True,
             )
             return self.status
+
+    # ------------------------------------------------------------------ #
+    # Giro città
+    # ------------------------------------------------------------------ #
+
+    async def play_route(
+        self, points: list[Coordinate], *, speed_kmh: float, label: str = "Giro"
+    ) -> Status:
+        """Avvia il playback di un giro: attraversa i punti in ordine, a
+        velocità costante, senza bloccare il resto della sessione — chi vuole
+        fermarlo o disconnettersi nel frattempo deve poterlo fare.
+        """
+        if len(points) < 2:
+            raise GpsSimError(
+                ErrorCode.LOCATION_UNSUPPORTED,
+                message="Il giro non ha punti a sufficienza.",
+                hint="Rigenera il giro e riprova.",
+            )
+        speed_kmh = max(1.0, speed_kmh)
+
+        async with self._lock:
+            self._require_backend()
+            await self._stop_route()
+            distance = total_distance_m(points)
+            self.status.route = RouteProgress(
+                label=label,
+                points=len(points),
+                index=0,
+                distance_m=distance,
+                remaining_m=distance,
+                speed_kmh=speed_kmh,
+                playing=True,
+            )
+            self._route_task = asyncio.create_task(
+                self._route_loop(points, speed_kmh, label), name="gps-route"
+            )
+            self._publish()
+            return self.status
+
+    async def stop_route(self) -> Status:
+        """Ferma il giro dov'è: la posizione simulata resta quella attuale.
+        Per tornare alla posizione reale c'è `restore_real_location`."""
+        async with self._lock:
+            was_playing = self.status.route is not None
+            await self._stop_route()
+            if was_playing:
+                self._set_state(
+                    self.status.state,
+                    message="Giro fermato.",
+                    real_location=self.status.real_location,
+                )
+            return self.status
+
+    async def _route_loop(self, points: list[Coordinate], speed_kmh: float, label: str) -> None:
+        total = total_distance_m(points)
+        traveled = 0.0
+        speed_m_s = (speed_kmh * 1000) / 3600
+        try:
+            for index, point in enumerate(points):
+                async with self._lock:
+                    if self.status.route is None:
+                        return
+                    await self._push_target(point)
+                    remaining = max(0.0, total - traveled)
+                    self.status.route.index = index
+                    self.status.route.remaining_m = remaining
+                self._set_state(
+                    SessionState.SIMULATING,
+                    message=f"{label}: punto {index + 1}/{len(points)} · "
+                    f"{remaining / 1000:.1f} km rimanenti",
+                    real_location=False,
+                )
+                self._start_keepalive()
+
+                if index + 1 < len(points):
+                    step = haversine_m(point, points[index + 1])
+                    traveled += step
+                    await asyncio.sleep(step / speed_m_s)
+        except asyncio.CancelledError:
+            raise
+        except GpsSimError:
+            # `_push_target` ha già segnato la sessione come persa: qui c'è solo
+            # da smettere di far avanzare un giro che non arriva più da nessuna parte.
+            if self.status.route is not None:
+                self.status.route.playing = False
+            return
+        else:
+            async with self._lock:
+                if self.status.route is not None:
+                    self.status.route.playing = False
+                    self.status.route.index = len(points) - 1
+                    self.status.route.remaining_m = 0.0
+            self._set_state(
+                SessionState.SIMULATING,
+                message=f"{label}: giro completato ({len(points)} punti).",
+                real_location=False,
+            )
 
     # ------------------------------------------------------------------ #
     # Keep-alive
@@ -555,6 +649,42 @@ class LocationSession:
             )
         return self._backend
 
+    async def _push_target(self, coordinate: Coordinate) -> None:
+        """Invia la posizione al backend e aggiorna solo i campi legati
+        all'invio: messaggio e stato generale restano decisione del chiamante
+        (`set_location` mostra le coordinate, il giro mostra l'avanzamento).
+
+        Va chiamato con `self._lock` già acquisito dal chiamante.
+        """
+        backend = self._require_backend()
+        try:
+            await backend.set(coordinate)
+        except Exception as exc:
+            error = classify(exc, default=ErrorCode.LOCATION_PUSH_FAILED)
+            self._mark_lost(error)
+            raise error from exc
+
+        self.status.target = coordinate
+        self.status.last_push_at = time.time()
+        self.status.last_push_ok = True
+        self.status.consecutive_push_failures = 0
+
+    async def _stop_route(self) -> None:
+        """Cancella il giro in corso, se c'è. Va chiamato con `self._lock` già
+        acquisito: è lo stesso pattern di `_stop_keepalive`."""
+        task = self._route_task
+        self._route_task = None
+        self.status.route = None
+        if task is None or task is asyncio.current_task():
+            return
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.debug("giro terminato con errore durante lo stop", exc_info=True)
+
     async def _clear_location(self, *, best_effort: bool) -> None:
         await self._stop_keepalive()
         backend = self._backend
@@ -575,6 +705,7 @@ class LocationSession:
         if recovery is not None and recovery is not asyncio.current_task():
             recovery.cancel()
 
+        await self._stop_route()
         await self._stop_keepalive()
         if self._backend is not None:
             await self._backend.close()

@@ -59,6 +59,29 @@
       </button>
     </section>
 
+    <section class="block">
+      <h2 class="block__title">Giro città</h2>
+      <div class="row">
+        <input id="tour-city" type="text" placeholder="Cesena, Cervia, Roma…"
+               autocomplete="off" aria-label="Città per il giro">
+      </div>
+      <div class="row row--coords">
+        <label>km/h <input id="tour-speed" type="number" min="1" max="200" step="1" value="50"></label>
+        <label>Tappe <input id="tour-waypoints" type="number" min="2" max="50" step="1" placeholder="auto"></label>
+      </div>
+      <button id="tour-plan" class="button button--block">Genera il giro</button>
+      <p id="tour-stats" class="hint"></p>
+      <div class="row">
+        <button id="tour-play" class="button button--primary" disabled>Avvia il giro</button>
+        <button id="tour-stop" class="button button--danger" hidden>Ferma il giro</button>
+      </div>
+      <p class="hint">
+        Copre l'intera area della città scelta su strade vere, non letteralmente
+        ogni via: per una città grande sarebbe un tour lunghissimo che nessun
+        motore di routing pubblico calcolerebbe in tempo utile.
+      </p>
+    </section>
+
     <p class="panel__footer">
       Serve la modalità sviluppatore attiva, l'iPhone sbloccato e — da iOS 17 —
       i permessi di amministratore per il tunnel.
@@ -82,6 +105,7 @@
     <span id="keepalive" class="statusbar__item" hidden>
       <span class="dot"></span><span id="keepalive-text"></span>
     </span>
+    <span id="route-info" class="statusbar__item" hidden></span>
     <span id="tunnel-info" class="statusbar__item" hidden></span>
     <span id="backend-info" class="statusbar__item" hidden></span>
   </footer>

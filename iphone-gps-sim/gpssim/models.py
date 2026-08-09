@@ -110,6 +110,45 @@ class TunnelInfo:
 
 
 @dataclass
+class RouteProgress:
+    """Avanzamento di un giro in corso (o appena pianificato): quanto manca,
+    non solo dov'è il prossimo punto."""
+
+    label: str
+    points: int
+    index: int
+    distance_m: float
+    remaining_m: float
+    speed_kmh: float
+    #: `False` mentre il giro è stato pianificato ma non ancora avviato.
+    playing: bool = False
+
+    @property
+    def progress_fraction(self) -> float:
+        if self.points <= 1:
+            return 1.0
+        return min(1.0, self.index / (self.points - 1))
+
+    @property
+    def eta_seconds(self) -> float:
+        speed_m_s = (self.speed_kmh * 1000) / 3600
+        return self.remaining_m / speed_m_s if speed_m_s > 0 else 0.0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "label": self.label,
+            "points": self.points,
+            "index": self.index,
+            "distance_m": self.distance_m,
+            "remaining_m": self.remaining_m,
+            "speed_kmh": self.speed_kmh,
+            "playing": self.playing,
+            "progress_fraction": self.progress_fraction,
+            "eta_seconds": self.eta_seconds,
+        }
+
+
+@dataclass
 class Status:
     """Istantanea completa dello stato: è il payload che la UI mostra."""
 
@@ -126,6 +165,8 @@ class Status:
     consecutive_push_failures: int = 0
     #: `True` quando sappiamo che l'iPhone sta mostrando la sua posizione reale.
     real_location: bool = True
+    #: Giro città in corso (o appena pianificato). `None` fuori da quel flusso.
+    route: RouteProgress | None = None
     error: dict[str, Any] | None = None
     message: str | None = None
 
@@ -141,6 +182,7 @@ class Status:
             "last_push_ok": self.last_push_ok,
             "consecutive_push_failures": self.consecutive_push_failures,
             "real_location": self.real_location,
+            "route": self.route.to_dict() if self.route else None,
             "error": self.error,
             "message": self.message,
         }

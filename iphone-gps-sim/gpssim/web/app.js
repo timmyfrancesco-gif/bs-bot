@@ -33,11 +33,13 @@ const state = {
   selectionLabel: null,
   devices: [],
   searchToken: 0,
+  tourPlan: null,        // {label, points, distance_m, speed_kmh} — dall'ultimo /api/routes/plan
 };
 
 let map;
 let selectionMarker;
 let activeMarker;
+let tourPolyline;
 let keepaliveTimer;
 
 // ---------------------------------------------------------------- utilità rete
@@ -285,6 +287,65 @@ function restoreReal() {
   });
 }
 
+// ---------------------------------------------------------------------- giro città
+
+/** Chiede il giro completo della città al server (geocodifica + routing reale),
+ *  lo disegna sulla mappa, ma non lo avvia: quello è un passo separato. */
+function planTour() {
+  return withBusy(el.tourPlanButton, async () => {
+    const city = el.tourCity.value.trim();
+    if (!city) throw { message: 'Scrivi il nome di una città.', hint: '' };
+
+    const waypoints = el.tourWaypoints.value ? Number.parseInt(el.tourWaypoints.value, 10) : null;
+    const body = {
+      city,
+      speed_kmh: Number.parseFloat(el.tourSpeed.value) || 50,
+      waypoints,
+    };
+    el.tourStats.textContent = 'Genero il giro… può richiedere qualche secondo.';
+    const plan = await api('/api/routes/plan', { method: 'POST', body: JSON.stringify(body) });
+
+    state.tourPlan = plan;
+    drawTourPolyline(plan.points);
+    const km = (plan.distance_m / 1000).toFixed(1);
+    const minutes = Math.round((plan.distance_m / 1000 / plan.speed_kmh) * 60);
+    el.tourStats.textContent = `${plan.label} — ${km} km, circa ${minutes} min a ${plan.speed_kmh} km/h.`;
+    refreshControls();
+  });
+}
+
+function playTour() {
+  return withBusy(el.tourPlay, async () => {
+    if (!state.tourPlan) throw { message: 'Genera prima il giro.', hint: '' };
+    applyStatus(await api('/api/routes/play', {
+      method: 'POST',
+      body: JSON.stringify({
+        points: state.tourPlan.points,
+        speed_kmh: state.tourPlan.speed_kmh,
+        label: state.tourPlan.label,
+      }),
+    }));
+  });
+}
+
+function stopTour() {
+  return withBusy(el.tourStop, async () => {
+    applyStatus(await api('/api/routes/stop', { method: 'POST' }));
+  });
+}
+
+function drawTourPolyline(points) {
+  if (tourPolyline) {
+    map.removeLayer(tourPolyline);
+    tourPolyline = null;
+  }
+  if (!points || points.length === 0) return;
+  const latlngs = points.map((point) => [point.latitude, point.longitude]);
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0a68d8';
+  tourPolyline = L.polyline(latlngs, { color: accent, weight: 3, opacity: 0.65 }).addTo(map);
+  map.fitBounds(tourPolyline.getBounds(), { padding: [24, 24] });
+}
+
 // ------------------------------------------------------------------------ stato
 
 function applyStatus(status) {
@@ -369,6 +430,17 @@ function renderStatusItems(status) {
 
   el.keepalive.hidden = status.state !== 'simulating' && status.state !== 'lost';
   renderKeepalive();
+
+  if (status.route) {
+    el.routeInfo.hidden = false;
+    const km = (status.route.remaining_m / 1000).toFixed(1);
+    const eta = Math.max(0, Math.round(status.route.eta_seconds / 60));
+    el.routeInfo.textContent = status.route.playing
+      ? `${status.route.label}: ${status.route.index + 1}/${status.route.points} · ${km} km rimanenti · ~${eta} min`
+      : `${status.route.label}: fermato`;
+  } else {
+    el.routeInfo.hidden = true;
+  }
 }
 
 /** L'età dell'ultimo invio va aggiornata anche quando non arrivano eventi:
@@ -414,6 +486,14 @@ function refreshControls() {
 
   el.apply.disabled = !connected || busy || (!state.selection && !readInputs());
   el.restore.disabled = !connected || busy || !(status && status.target);
+
+  const route = status && status.route;
+  const routePlaying = Boolean(route && route.playing);
+  el.tourPlay.hidden = routePlaying;
+  el.tourStop.hidden = !routePlaying;
+  el.tourPlanButton.disabled = !connected || busy || routePlaying;
+  el.tourPlay.disabled = !connected || busy || !state.tourPlan || routePlaying;
+  el.tourStop.disabled = busy;
 }
 
 // -------------------------------------------------------------------- eventi SSE
@@ -446,7 +526,9 @@ function cacheElements() {
     alertDetail: 'alert-detail', alertClose: 'alert-close', statusbar: 'statusbar',
     statePill: 'state-pill', locationBadge: 'location-badge', statusMessage: 'status-message',
     keepalive: 'keepalive', keepaliveText: 'keepalive-text', tunnelInfo: 'tunnel-info',
-    backendInfo: 'backend-info',
+    backendInfo: 'backend-info', routeInfo: 'route-info', tourCity: 'tour-city',
+    tourSpeed: 'tour-speed', tourWaypoints: 'tour-waypoints', tourPlanButton: 'tour-plan',
+    tourStats: 'tour-stats', tourPlay: 'tour-play', tourStop: 'tour-stop',
   };
   for (const [key, id] of Object.entries(ids)) {
     el[key] = document.getElementById(id);
@@ -478,6 +560,16 @@ function bindEvents() {
   el.apply.addEventListener('click', applyLocation);
   el.restore.addEventListener('click', restoreReal);
   el.alertClose.addEventListener('click', clearError);
+
+  el.tourPlanButton.addEventListener('click', planTour);
+  el.tourPlay.addEventListener('click', playTour);
+  el.tourStop.addEventListener('click', stopTour);
+  el.tourCity.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      planTour();
+    }
+  });
 
   el.searchButton.addEventListener('click', runSearch);
   el.searchInput.addEventListener('keydown', (event) => {

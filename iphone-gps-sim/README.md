@@ -8,7 +8,7 @@ sviluppatore di iOS. Alternativa open source a GhostMe.
 
 > **Non è ancora stato provato su un iPhone vero.** È stato sviluppato in un
 > ambiente senza USB, quindi tutto ciò che non tocca il dispositivo è verificato
-> (91 test, l'interfaccia pilotata in un browser reale, le firme di
+> (140 test, l'interfaccia pilotata in un browser reale, le firme di
 > `pymobiledevice3` 10.4.0 controllate una per una, la riga di comando del tunnel
 > eseguita davvero contro il CLI); l'ultimo tratto — mount della DDI, tunnel
 > aperto, coordinate accettate dall'iPhone — no. Se qualcosa non va, parti da
@@ -50,6 +50,30 @@ in tre punti contemporaneamente — pastiglia di stato rossa, badge che dichiara
 «posizione reale (simulazione caduta)», banner con il motivo — e il segnaposto
 sulla mappa diventa rosso invece di scomparire: era lì che stavi simulando, ed è
 quello che credevi fosse ancora vero.
+
+### Giro città: gira per tutta l'area di una città, non solo un punto
+
+Oltre a impostare una singola posizione, l'app pianifica un **giro di andata e
+ritorno che copre l'intera area di una città** — scrivi "Cesena", "Cervia",
+"Roma", qualunque città — su strade vere, a una velocità che scegli tu, e il
+telefono si sposta lungo il tracciato in tempo reale.
+
+Non è però una copertura letterale di *ogni singola via*: quello è un problema
+diverso (in teoria dei grafi si chiama "del postino cinese" — un tour che
+attraversa ogni arco di un grafo), enorme su una città grande. Il grafo
+stradale di Roma ha decine di migliaia di segmenti; un tour che li tocchi tutti
+durerebbe giorni anche a velocità autostradale, e nessun motore di routing
+pubblico lo calcolerebbe in tempo utile. Quello che l'app fa invece:
+
+1. Geocodifica la città e prende il suo riquadro geografico.
+2. Campiona punti a griglia dentro quel riquadro — più punti quanto più la
+   città è estesa — per coprire l'intera area, non solo il centro.
+3. Chiede al motore di routing (OSRM) il giro di andata e ritorno più
+   efficiente che tocchi tutti quei punti su strade reali, partendo e tornando
+   allo stesso posto.
+4. Infittisce la geometria risultante a un punto ogni ~20 m, così il
+   dispositivo si sposta con passi regolari invece che a scatti sulle
+   rettilinee.
 
 ## Requisiti
 
@@ -128,6 +152,14 @@ ripristinata.
 La barra di stato in basso dice sempre tre cose: in che stato è la sessione, cosa
 sta *effettivamente* mostrando l'iPhone, e se il keep-alive sta ancora girando.
 
+Nel pannello **Giro città**: scrivi il nome di una città, imposta la velocità
+(km/h) e premi **Genera il giro** — traccia il percorso sulla mappa e mostra
+distanza e tempo stimato, senza ancora muovere nulla. Premi **Avvia il giro**
+per farlo partire davvero; **Ferma il giro** lo interrompe dov'è (per tornare
+alla posizione reale c'è sempre «Ripristina posizione reale»). Il campo
+«Tappe» è opzionale: lasciandolo vuoto l'app sceglie da sola in base
+all'estensione della città.
+
 ### Riga di comando
 
 ```bash
@@ -167,6 +199,7 @@ amministratore». Su iOS 16 e precedenti il tunnel non serve e `sudo` nemmeno.
 | `gpssim/device.py` | Rilevamento, lockdown, developer mode, mount DDI, RSD → `DeviceConnection` |
 | `gpssim/location.py` | Backend di posizione + `LocationSession` (keep-alive, stato, recupero) |
 | `gpssim/geocode.py` | Nominatim con rate limit, cache e User-Agent identificativo |
+| `gpssim/routing.py` | Giro città: campionamento dell'area + routing OSRM + infittimento della geometria |
 | `gpssim/api.py` | API FastAPI locale + stream SSE dello stato |
 | `gpssim/server.py` | Avvio di uvicorn, in primo piano o in un thread di servizio |
 | `gpssim/desktop.py` | Wrapper `pywebview` |
@@ -203,12 +236,15 @@ deve mai ricomporlo da risposte diverse.
 | `GET /api/events` | stream SSE dello stato |
 | `GET /api/geocode/search?q=` | ricerca indirizzi |
 | `GET /api/geocode/reverse?latitude=&longitude=` | nome del luogo alle coordinate |
+| `POST /api/routes/plan` | pianifica il giro di una città (`{city, speed_kmh, profile, waypoints}`), non lo avvia |
+| `POST /api/routes/play` | avvia il playback di un giro (`{points, speed_kmh, label}`) |
+| `POST /api/routes/stop` | ferma il giro dov'è |
 
 Il codice HTTP distingue i casi prima che serva leggere il corpo: `403` permessi
-insufficienti, `404` nessun dispositivo, `503` usbmuxd assente, `409` dispositivo
-non in uno stato utilizzabile (bloccato, dev mode off, DDI non montata, tunnel
-caduto), `502` ricerca indirizzi non disponibile. Il corpo porta sempre
-`error.code`, `error.message`, `error.hint`.
+insufficienti, `404` nessun dispositivo o città non trovata, `503` usbmuxd
+assente, `409` dispositivo non in uno stato utilizzabile (bloccato, dev mode
+off, DDI non montata, tunnel caduto), `502` ricerca indirizzi o routing non
+disponibili. Il corpo porta sempre `error.code`, `error.message`, `error.hint`.
 
 Lo stato arriva anche in **push** su `/api/events`, e non è un dettaglio: la
 caduta del tunnel non è provocata da un click, quindi non può essere comunicata
@@ -222,6 +258,16 @@ rispettare il limite di **una richiesta al secondo**, cosa che una coda
 serializzata fa e la digitazione dell'utente no. C'è anche una cache, che tra
 l'altro rende gratuito il reverse geocoding mentre si trascina il segnaposto.
 Con `GPSSIM_NOMINATIM_URL` si punta a un'istanza propria.
+
+### Motore di routing
+
+Il giro città usa il server pubblico di demo di **OSRM**
+(`router.project-osrm.org`), gratuito e senza chiave, ma condiviso e non
+pensato per un uso pesante — non ha il rate limit esplicito di Nominatim, ma
+non va bombardato di richieste. Per un uso serio, o per città enormi che il
+demo rifiuta, punta un'istanza propria con `GPSSIM_ROUTER_URL`. Il tetto di 50
+tappe per giro (`gpssim.routing.MAX_WAYPOINTS`) esiste apposta perché il
+servizio pubblico non calcolerebbe in tempo utile un tour con troppe fermate.
 
 ### Errori gestiti
 
@@ -245,6 +291,19 @@ session.add_listener(lambda status: print(status.to_dict()))
 
 await session.connect()                                # DDI + tunnel + backend
 await session.set_location(Coordinate(45.4642, 9.19))  # avvia il keep-alive
+
+# Il giro città è due passi separati: pianificare (geocodifica + routing,
+# senza toccare il dispositivo) e avviare (che invece lo tocca).
+from gpssim.geocode import BoundingBox, Geocoder
+from gpssim.routing import Router, plan_city_tour
+
+geocoder, router = Geocoder(), Router()
+place = (await geocoder.search("Cesena", limit=1))[0]
+bbox = place.bbox or BoundingBox.around(place.coordinate, 0.02)  # non tutti i risultati hanno un riquadro
+plan = await plan_city_tour(router, bbox=bbox, origin=place.coordinate, label=f"Giro di {place.label}")
+await session.play_route(plan.points, speed_kmh=50, label=plan.label)
+await session.stop_route()  # oppure lascialo finire da solo
+
 await session.restore_real_location()
 await session.disconnect()
 ```
@@ -255,11 +314,13 @@ await session.disconnect()
 python -m unittest discover -s tests -t .
 ```
 
-90 test, nessun iPhone necessario. Il tunnel è esercitato con sottoprocessi finti
-(cattura dell'output, morte del processo, privilegi mancanti, timeout), la
+140 test, nessun iPhone necessario. Il tunnel è esercitato con sottoprocessi
+finti (cattura dell'output, morte del processo, privilegi mancanti, timeout), la
 sessione con un backend finto (keep-alive, degrado, passaggio a `LOST`,
-riconnessione), l'API con una sessione finta, e Nominatim con un transport finto
-(rate limit, cache, 429, timeout, risposte malformate).
+riconnessione, playback di un giro), l'API con una sessione finta, Nominatim con
+un transport finto (rate limit, cache, 429, timeout, risposte malformate), e
+OSRM con un transport finto (costruzione dell'URL, infittimento della
+geometria, tetto sulle tappe, guasti del motore di routing).
 
 Lo stream SSE è testato in due punti: la logica del generatore, dove tutto sta in
 un solo event loop, e il percorso reale con uvicorn in un thread — `TestClient`
@@ -278,13 +339,17 @@ Non è nella suite (Chromium è una dipendenza pesante per un progetto il cui cu
 trovato due difetti che nessun test Python avrebbe visto: un segnaposto che
 spariva invece di diventare rosso alla caduta del tunnel, e un `display: flex`
 che vinceva sull'attributo `hidden`, tenendo il banner d'errore sempre a schermo.
+Copre anche il giro città: pianificazione, tracciato disegnato sulla mappa,
+avvio, avanzamento in barra di stato, stop.
 
 ## Roadmap
 
 - **Fase 1 ✅** — device manager, location service, CLI di test
 - **Fase 2 ✅** — API FastAPI, mappa Leaflet, ricerca Nominatim, barra di stato,
   pulsante «ripristina posizione reale», wrapper `pywebview`
-- **Fase 3** — bookmark, cronologia (SQLite), percorsi GPX
+- **Giro città ✅** — giro di andata e ritorno esteso su tutta l'area di una
+  città a scelta, su strade reali (OSRM), a velocità configurabile
+- **Fase 3** — bookmark, cronologia (SQLite), percorsi GPX importati da file
 - **Fase 4** — build con PyInstaller
 
 ## Avvertenza

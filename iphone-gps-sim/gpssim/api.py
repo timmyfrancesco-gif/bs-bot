@@ -26,9 +26,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .errors import ErrorCode, GpsSimError
-from .geocode import Geocoder, GeocodingError
+from .geocode import BoundingBox, Geocoder, GeocodingError
 from .location import LocationSession
 from .models import Coordinate, Status
+from .routing import RouteError, Router
+from .routing import plan_city_tour as compute_city_tour
 
 logger = logging.getLogger(__name__)
 
@@ -62,14 +64,30 @@ class ConnectRequest(BaseModel):
     udid: str | None = None
 
 
+class CityTourRequest(BaseModel):
+    city: str = Field(min_length=1, max_length=200)
+    speed_kmh: float = Field(default=50.0, gt=0, le=200)
+    profile: str = Field(default="driving", pattern="^(driving|cycling|walking)$")
+    #: `None` lascia decidere in base all'estensione della città.
+    waypoints: int | None = Field(default=None, ge=2, le=50)
+
+
+class PlayRouteRequest(BaseModel):
+    points: list[LocationRequest] = Field(min_length=2)
+    speed_kmh: float = Field(gt=0, le=200)
+    label: str = Field(default="Giro", max_length=200)
+
+
 def create_app(
     *,
     session: LocationSession | None = None,
     geocoder: Geocoder | None = None,
+    router: Router | None = None,
 ) -> FastAPI:
-    """Costruisce l'app. Sessione e geocoder sono iniettabili per i test."""
+    """Costruisce l'app. Sessione, geocoder e router sono iniettabili per i test."""
     session = session or LocationSession()
     geocoder = geocoder or Geocoder()
+    router = router or Router()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -81,6 +99,8 @@ def create_app(
             await session.disconnect()
         with suppress(Exception):
             await geocoder.close()
+        with suppress(Exception):
+            await router.close()
 
     app = FastAPI(
         title="iphone-gps-sim",
@@ -89,6 +109,7 @@ def create_app(
     )
     app.state.session = session
     app.state.geocoder = geocoder
+    app.state.router = router
 
     # ------------------------------------------------------------------ #
     # Errori
@@ -105,6 +126,10 @@ def create_app(
 
     @app.exception_handler(GeocodingError)
     async def _handle_geocoding_error(_request: Request, error: GeocodingError) -> JSONResponse:
+        return JSONResponse(status_code=502, content={"error": error.to_dict()})
+
+    @app.exception_handler(RouteError)
+    async def _handle_route_error(_request: Request, error: RouteError) -> JSONResponse:
         return JSONResponse(status_code=502, content={"error": error.to_dict()})
 
     # ------------------------------------------------------------------ #
@@ -151,6 +176,54 @@ def create_app(
     async def restore_location() -> dict[str, Any]:
         """Il pulsante «ripristina posizione reale»."""
         status = await session.restore_real_location()
+        return status.to_dict()
+
+    # ------------------------------------------------------------------ #
+    # Giro città
+    # ------------------------------------------------------------------ #
+
+    @app.post("/api/routes/plan")
+    async def plan_route(payload: CityTourRequest) -> Any:
+        """Pianifica (senza avviare) un giro che copre l'area della città data.
+
+        Non è "ogni singola strada": campiona l'area con più tappe quanto più
+        la città è estesa e chiede al motore di routing il giro di andata e
+        ritorno più efficiente che le tocchi tutte, su strade vere.
+        """
+        places = await geocoder.search(payload.city, limit=1)
+        if not places:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error": {
+                        "code": "city_not_found",
+                        "message": f"Nessun risultato per «{payload.city}».",
+                        "hint": "Controlla il nome e riprova — anche solo il nome della città basta.",
+                    }
+                },
+            )
+        place = places[0]
+        bbox = place.bbox or BoundingBox.around(place.coordinate, 0.02)
+        label = f"Giro di {place.label.split(',')[0].strip()}"
+        plan = await compute_city_tour(
+            router,
+            bbox=bbox,
+            origin=place.coordinate,
+            label=label,
+            waypoint_count=payload.waypoints,
+            profile=payload.profile,
+        )
+        return {**plan.to_dict(), "speed_kmh": payload.speed_kmh}
+
+    @app.post("/api/routes/play")
+    async def play_route(payload: PlayRouteRequest) -> dict[str, Any]:
+        points = [Coordinate(point.latitude, point.longitude) for point in payload.points]
+        status = await session.play_route(points, speed_kmh=payload.speed_kmh, label=payload.label)
+        return status.to_dict()
+
+    @app.post("/api/routes/stop")
+    async def stop_route() -> dict[str, Any]:
+        status = await session.stop_route()
         return status.to_dict()
 
     # ------------------------------------------------------------------ #

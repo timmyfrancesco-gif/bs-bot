@@ -31,7 +31,7 @@ from gpssim.api import create_app  # noqa: E402
 from gpssim.errors import ErrorCode, GpsSimError  # noqa: E402
 from gpssim.models import Coordinate, SessionState, Status  # noqa: E402
 from gpssim.server import BackgroundServer, pick_port  # noqa: E402
-from tests.test_api import FakeGeocoder, FakeSession  # noqa: E402
+from tests.test_api import FakeGeocoder, FakeRouter, FakeSession  # noqa: E402
 
 
 class FlakySession(FakeSession):
@@ -90,7 +90,7 @@ async def run(headed: bool, screenshots: Path | None, chromium: Path | None) -> 
 
     session = FlakySession()
     server = BackgroundServer(
-        lambda: create_app(session=session, geocoder=FakeGeocoder()),
+        lambda: create_app(session=session, geocoder=FakeGeocoder(), router=FakeRouter()),
         port=pick_port(preferred=0),
     )
     url = await asyncio.to_thread(server.start)
@@ -227,6 +227,31 @@ async def run(headed: bool, screenshots: Path | None, chromium: Path | None) -> 
         checker.check("il segnaposto attivo viene rimosso", await count(".marker-active") == 0)
         checker.check("il banner si richiude", not await visible("#alert"))
         await snap("05-ripristinato")
+
+        # ------------------------------------------------------------ giro città
+        print("\ngiro città")
+        await page.fill("#tour-city", "Milano")
+        await page.click("#tour-plan")
+        await page.wait_for_function(
+            "document.querySelector('#tour-stats').textContent.includes('km')", timeout=8000
+        )
+        checker.check("le statistiche del giro sono mostrate", "km" in await text("#tour-stats"))
+        checker.check("il tracciato è disegnato sulla mappa", await count(".leaflet-interactive") >= 1)
+        checker.check("«Avvia il giro» si abilita dopo la pianificazione", await enabled("#tour-play"))
+        await snap("06-giro-pianificato")
+
+        await page.click("#tour-play")
+        await wait_state("simulazione")
+        checker.check("la barra mostra l'avanzamento del giro", await visible("#route-info"))
+        route_info = await text("#route-info")
+        checker.check("l'avanzamento nomina la città", "Milano" in route_info, route_info)
+        checker.check("«Ferma il giro» sostituisce «Avvia il giro»", await visible("#tour-stop"))
+        await snap("07-giro-avviato")
+
+        await page.click("#tour-stop")
+        await page.wait_for_function("document.getElementById('route-info').hidden === true", timeout=5000)
+        checker.check("fermare il giro nasconde l'avanzamento", not await visible("#route-info"))
+        checker.check("«Avvia il giro» ricompare dopo lo stop", await visible("#tour-play"))
 
         await browser.close()
 

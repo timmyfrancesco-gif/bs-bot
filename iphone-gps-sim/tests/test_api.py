@@ -7,9 +7,10 @@ from fastapi.testclient import TestClient
 
 from gpssim.api import _status_stream, create_app
 from gpssim.errors import ErrorCode, GpsSimError
-from gpssim.geocode import GeocodingError, Place
+from gpssim.geocode import BoundingBox, GeocodingError, Place
 from gpssim.location import LocationSession
-from gpssim.models import Coordinate, DeviceInfo, SessionState, Status, TunnelInfo
+from gpssim.models import Coordinate, DeviceInfo, RouteProgress, SessionState, Status, TunnelInfo
+from gpssim.routing import RouteError
 from gpssim.server import BackgroundServer, pick_port
 
 MILANO = Coordinate(45.4642, 9.1900)
@@ -86,17 +87,56 @@ class FakeSession:
         self.status.real_location = True
         return self.status
 
+    async def play_route(
+        self, points: list[Coordinate], *, speed_kmh: float, label: str = "Giro"
+    ) -> Status:
+        self.calls.append(("play_route", (len(points), speed_kmh, label)))
+        if self.fail_with is not None:
+            raise self.fail_with
+        self.status.state = SessionState.SIMULATING
+        self.status.target = points[0]
+        self.status.real_location = False
+        self.status.route = RouteProgress(
+            label=label,
+            points=len(points),
+            index=0,
+            distance_m=1000.0,
+            remaining_m=1000.0,
+            speed_kmh=speed_kmh,
+            playing=True,
+        )
+        return self.status
+
+    async def stop_route(self) -> Status:
+        self.calls.append(("stop_route", None))
+        self.status.route = None
+        return self.status
+
+
+MILANO_BBOX = BoundingBox(south=45.39, north=45.53, west=9.04, east=9.27)
+
 
 class FakeGeocoder:
     def __init__(self) -> None:
         self.searches: list[str] = []
         self.fail_with: BaseException | None = None
+        #: `False` fa restituire un risultato senza riquadro, per esercitare il
+        #: fallback di `/api/routes/plan`.
+        self.with_bbox = True
 
     async def search(self, query: str, *, limit: int = 6) -> list[Place]:
         self.searches.append(query)
         if self.fail_with is not None:
             raise self.fail_with
-        return [Place(label="Milano, Italia", coordinate=MILANO, kind="city")][:limit]
+        if query == "città-inesistente":
+            return []
+        place = Place(
+            label="Milano, Lombardia, Italia",
+            coordinate=MILANO,
+            kind="city",
+            bbox=MILANO_BBOX if self.with_bbox else None,
+        )
+        return [place][:limit]
 
     async def reverse(self, coordinate: Coordinate) -> Place | None:
         if self.fail_with is not None:
@@ -107,11 +147,33 @@ class FakeGeocoder:
         return None
 
 
+class FakeRouter:
+    """Sostituisce `Router`: il giro città non deve dipendere da OSRM per i test."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[list[Coordinate], str]] = []
+        self.fail_with: BaseException | None = None
+
+    async def trip(
+        self, waypoints: list[Coordinate], *, profile: str = "driving"
+    ) -> tuple[list[Coordinate], float]:
+        self.calls.append((waypoints, profile))
+        if self.fail_with is not None:
+            raise self.fail_with
+        origin = waypoints[0]
+        geometry = [origin, Coordinate(origin.latitude + 0.001, origin.longitude), origin]
+        return geometry, 300.0
+
+    async def close(self) -> None:
+        return None
+
+
 class ApiTest(unittest.TestCase):
     def setUp(self) -> None:
         self.session = FakeSession()
         self.geocoder = FakeGeocoder()
-        app = create_app(session=self.session, geocoder=self.geocoder)
+        self.router = FakeRouter()
+        app = create_app(session=self.session, geocoder=self.geocoder, router=self.router)
         self.client = TestClient(app)
 
     # ------------------------------------------------------------------ #
@@ -163,6 +225,106 @@ class ApiTest(unittest.TestCase):
         self.assertIsNone(payload["target"])
 
     # ------------------------------------------------------------------ #
+    # Giro città
+    # ------------------------------------------------------------------ #
+
+    def test_plan_route_pianifica_un_giro_per_la_citta(self) -> None:
+        response = self.client.post(
+            "/api/routes/plan", json={"city": "Milano", "speed_kmh": 40, "waypoints": 5}
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        self.assertIn("Milano", payload["label"])
+        self.assertEqual(payload["speed_kmh"], 40)
+        self.assertGreater(len(payload["points"]), 2, "la geometria grezza andava infittita")
+        self.assertGreater(payload["distance_m"], 0)
+
+        # La prima tappa mandata al router deve essere l'origine geocodificata.
+        waypoints, profile = self.router.calls[0]
+        self.assertEqual(waypoints[0], MILANO)
+        self.assertEqual(profile, "driving")
+        self.assertEqual(len(waypoints), 5)
+
+    def test_plan_route_rispetta_il_profilo_richiesto(self) -> None:
+        self.client.post("/api/routes/plan", json={"city": "Milano", "profile": "walking"})
+        _waypoints, profile = self.router.calls[0]
+        self.assertEqual(profile, "walking")
+
+    def test_plan_route_profilo_non_valido_e_rifiutato_dalla_validazione(self) -> None:
+        response = self.client.post("/api/routes/plan", json={"city": "Milano", "profile": "volo"})
+        self.assertEqual(response.status_code, 422)
+
+    def test_plan_route_senza_riquadro_usa_un_fallback_attorno_al_punto(self) -> None:
+        """Non tutti i risultati di Nominatim hanno un `boundingbox`: senza,
+        il giro deve comunque uscire da un singolo punto ripetuto."""
+        self.geocoder.with_bbox = False
+        response = self.client.post("/api/routes/plan", json={"city": "Milano"})
+        self.assertEqual(response.status_code, 200)
+        waypoints, _profile = self.router.calls[0]
+        # Più di una tappa distinta: il riquadro sintetico non è degenere.
+        self.assertGreater(len({(w.latitude, w.longitude) for w in waypoints}), 1)
+
+    def test_plan_route_citta_non_trovata_e_404(self) -> None:
+        response = self.client.post("/api/routes/plan", json={"city": "città-inesistente"})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["error"]["code"], "city_not_found")
+
+    def test_plan_route_router_fallito_e_502(self) -> None:
+        self.router.fail_with = RouteError("il motore di routing non risponde")
+        response = self.client.post("/api/routes/plan", json={"city": "Milano"})
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.json()["error"]["code"], "route_failed")
+
+    def test_play_route(self) -> None:
+        response = self.client.post(
+            "/api/routes/play",
+            json={
+                "points": [
+                    {"latitude": 45.4642, "longitude": 9.19},
+                    {"latitude": 45.4652, "longitude": 9.19},
+                ],
+                "speed_kmh": 40,
+                "label": "Giro di prova",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["state"], "simulating")
+        self.assertIsNotNone(payload["route"])
+        self.assertEqual(payload["route"]["label"], "Giro di prova")
+        self.assertTrue(payload["route"]["playing"])
+
+    def test_play_route_meno_di_due_punti_rifiutato_dalla_validazione(self) -> None:
+        response = self.client.post(
+            "/api/routes/play",
+            json={"points": [{"latitude": 45.46, "longitude": 9.19}], "speed_kmh": 40},
+        )
+        self.assertEqual(response.status_code, 422)
+
+    def test_play_route_velocita_fuori_range_rifiutata_dalla_validazione(self) -> None:
+        points = [{"latitude": 45.46, "longitude": 9.19}, {"latitude": 45.47, "longitude": 9.19}]
+        for speed in (0, -5, 500):
+            with self.subTest(speed=speed):
+                response = self.client.post(
+                    "/api/routes/play", json={"points": points, "speed_kmh": speed}
+                )
+                self.assertEqual(response.status_code, 422)
+
+    def test_stop_route(self) -> None:
+        self.client.post(
+            "/api/routes/play",
+            json={
+                "points": [{"latitude": 45.46, "longitude": 9.19}, {"latitude": 45.47, "longitude": 9.19}],
+                "speed_kmh": 40,
+            },
+        )
+        response = self.client.post("/api/routes/stop")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["route"])
+        self.assertEqual(self.session.calls[-1], ("stop_route", None))
+
+    # ------------------------------------------------------------------ #
     # Errori: il codice HTTP deve distinguere i casi, il corpo deve spiegarli
     # ------------------------------------------------------------------ #
 
@@ -204,7 +366,7 @@ class ApiTest(unittest.TestCase):
 
     def test_ricerca_indirizzo(self) -> None:
         payload = self.client.get("/api/geocode/search", params={"q": "milano"}).json()
-        self.assertEqual(payload["results"][0]["label"], "Milano, Italia")
+        self.assertEqual(payload["results"][0]["label"], "Milano, Lombardia, Italia")
         self.assertEqual(payload["results"][0]["latitude"], 45.4642)
         self.assertEqual(self.geocoder.searches, ["milano"])
 

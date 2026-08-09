@@ -3,7 +3,7 @@ import unittest
 
 import httpx
 
-from gpssim.geocode import Geocoder, GeocodingError, _parse
+from gpssim.geocode import BoundingBox, Geocoder, GeocodingError, _parse
 from gpssim.models import Coordinate
 
 SEARCH_PAYLOAD = [
@@ -12,6 +12,7 @@ SEARCH_PAYLOAD = [
         "lon": "9.1919",
         "display_name": "Milano, Lombardia, Italia",
         "type": "city",
+        "boundingbox": ["45.3906", "45.5354", "9.0400", "9.2700"],
     },
     {
         "lat": "45.4640",
@@ -58,6 +59,38 @@ class ParseTest(unittest.TestCase):
     def test_senza_display_name_usa_name(self) -> None:
         places = _parse([{"lat": "1", "lon": "2", "name": "Posto"}])
         self.assertEqual(places[0].label, "Posto")
+
+    def test_estrae_il_riquadro_quando_presente(self) -> None:
+        places = _parse(SEARCH_PAYLOAD)
+        bbox = places[0].bbox
+        self.assertIsNotNone(bbox)
+        assert bbox is not None
+        self.assertAlmostEqual(bbox.south, 45.3906)
+        self.assertAlmostEqual(bbox.north, 45.5354)
+        self.assertAlmostEqual(bbox.west, 9.0400)
+        self.assertAlmostEqual(bbox.east, 9.2700)
+
+    def test_nessun_riquadro_e_bbox_none(self) -> None:
+        self.assertIsNone(_parse(SEARCH_PAYLOAD)[1].bbox)
+
+    def test_riquadro_malformato_e_ignorato(self) -> None:
+        places = _parse([{"lat": "1", "lon": "2", "boundingbox": ["solo", "due"]}])
+        self.assertIsNone(places[0].bbox)
+
+
+class BoundingBoxTest(unittest.TestCase):
+    def test_center(self) -> None:
+        bbox = BoundingBox(south=44.0, north=45.0, west=12.0, east=13.0)
+        center = bbox.center
+        self.assertAlmostEqual(center.latitude, 44.5)
+        self.assertAlmostEqual(center.longitude, 12.5)
+
+    def test_around_costruisce_un_riquadro_simmetrico(self) -> None:
+        bbox = BoundingBox.around(Coordinate(44.5, 12.5), 0.1)
+        self.assertAlmostEqual(bbox.south, 44.4)
+        self.assertAlmostEqual(bbox.north, 44.6)
+        self.assertAlmostEqual(bbox.west, 12.4)
+        self.assertAlmostEqual(bbox.east, 12.6)
 
 
 class GeocoderTest(unittest.IsolatedAsyncioTestCase):

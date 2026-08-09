@@ -38,11 +38,42 @@ CACHE_SIZE = 128
 
 
 @dataclass(frozen=True)
+class BoundingBox:
+    """Riquadro geografico di un luogo (in genere una città), da Nominatim."""
+
+    south: float
+    north: float
+    west: float
+    east: float
+
+    @property
+    def center(self) -> Coordinate:
+        return Coordinate((self.south + self.north) / 2, (self.west + self.east) / 2)
+
+    @classmethod
+    def around(cls, coordinate: Coordinate, half_span_deg: float) -> BoundingBox:
+        """Un riquadro sintetico centrato su un punto: serve quando Nominatim
+        non fornisce un riquadro (o ne fornisce uno troppo piccolo per un giro)."""
+        return cls(
+            south=coordinate.latitude - half_span_deg,
+            north=coordinate.latitude + half_span_deg,
+            west=coordinate.longitude - half_span_deg,
+            east=coordinate.longitude + half_span_deg,
+        )
+
+    def to_dict(self) -> dict[str, float]:
+        return {"south": self.south, "north": self.north, "west": self.west, "east": self.east}
+
+
+@dataclass(frozen=True)
 class Place:
     label: str
     coordinate: Coordinate
     #: Categoria OSM (``city``, ``restaurant``, …): utile come sottotitolo.
     kind: str | None = None
+    #: Presente solo per luoghi "areali" (città, quartieri): Nominatim lo
+    #: restituisce per ogni risultato, non solo per quelli espliciti come `city`.
+    bbox: BoundingBox | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -50,6 +81,7 @@ class Place:
             "latitude": self.coordinate.latitude,
             "longitude": self.coordinate.longitude,
             "kind": self.kind,
+            "bbox": self.bbox.to_dict() if self.bbox else None,
         }
 
 
@@ -200,5 +232,23 @@ def _parse(payload: Any) -> list[Place]:
             logger.debug("scarto un risultato con coordinate non valide: %r", entry)
             continue
         label = entry.get("display_name") or entry.get("name") or "senza nome"
-        places.append(Place(label=label, coordinate=coordinate, kind=entry.get("type")))
+        places.append(
+            Place(
+                label=label,
+                coordinate=coordinate,
+                kind=entry.get("type"),
+                bbox=_parse_bbox(entry.get("boundingbox")),
+            )
+        )
     return places
+
+
+def _parse_bbox(raw: Any) -> BoundingBox | None:
+    """Nominatim restituisce `["south", "north", "west", "east"]` come stringhe."""
+    if not isinstance(raw, list) or len(raw) != 4:
+        return None
+    try:
+        south, north, west, east = (float(value) for value in raw)
+    except (TypeError, ValueError):
+        return None
+    return BoundingBox(south=south, north=north, west=west, east=east)
