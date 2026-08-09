@@ -269,14 +269,21 @@ pensato per un uso pesante — non ha il rate limit esplicito di Nominatim, ma
 non va bombardato di richieste. Per un uso serio, o per città enormi che il
 demo rifiuta, punta un'istanza propria con `GPSSIM_ROUTER_URL`.
 
-Il tetto di 15 tappe per giro (`gpssim.routing.MAX_WAYPOINTS`) esiste apposta:
+Il tetto di 15 tappe per giro (`gpssim.routing.MAX_WAYPOINTS`) esiste perché
 `/trip` risolve un problema del commesso viaggiatore, il cui costo cresce
-rapidissimo con le tappe, e il server pubblico rifiuta (`HTTP 400`) le
-richieste troppo pesanti prima ancora di provarci. Su un'istanza propria il
-tetto si può alzare parecchio. Se compare comunque un «Il motore di routing ha
-risposto 400», il messaggio d'errore ora porta il corpo della risposta di OSRM
-nel dettaglio: aiuta a capire se la causa è davvero il numero di tappe o
-qualcos'altro.
+rapidissimo con le tappe; su un'istanza propria si può alzare parecchio. Se
+compare comunque un «Il motore di routing ha risposto 400», il messaggio
+d'errore porta nel dettaglio sia il corpo della risposta di OSRM sia la
+richiesta esatta che gli abbiamo mandato — la diagnosi migliore possibile per
+un servizio che non controlliamo.
+
+Nota per chi tocca `gpssim/routing.py`: il parametro `destination` dell'API
+`/trip` accetta solo `"any"` o `"last"`. Un valore diverso (es. `"first"`) non
+dà un errore applicativo pulito — fa fallire il parser di OSRM con un secco
+`HTTP 400 Query string malformed`, prima ancora che la richiesta venga
+esaminata. Per questo qui `destination` non viene impostato affatto: il
+default `"any"` va bene, non ci interessa quale tappa risulti nominalmente
+ultima quando comunque si torna all'origine.
 
 ### Errori gestiti
 

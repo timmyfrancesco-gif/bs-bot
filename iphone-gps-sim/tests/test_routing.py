@@ -126,6 +126,24 @@ class RouterTripTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(geometry, [Coordinate(45.4642, 9.19), Coordinate(45.4652, 9.191)])
         self.assertEqual(distance, 1000.0)
 
+    async def test_non_manda_un_destination_non_valido(self) -> None:
+        """Regressione: `destination` accetta solo "any" o "last" secondo la
+        API di OSRM — "first" fa fallire il parser con un secco 400 "Query
+        string malformed", prima ancora di guardare le tappe."""
+        requests: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            return httpx.Response(200, json=_trip_payload([[9.19, 45.4642], [9.1910, 45.4652]]))
+
+        router = Router(endpoint="https://osrm.test", client=_client(handler))
+        await router.trip([MILANO, MILANO_NORD])
+
+        query = requests[0].url.params
+        self.assertNotIn("destination", query)
+        self.assertEqual(query.get("source"), "first")
+        self.assertEqual(query.get("roundtrip"), "true")
+
     async def test_meno_di_due_tappe_non_chiama_la_rete(self) -> None:
         def handler(_request: httpx.Request) -> httpx.Response:
             raise AssertionError("non doveva partire nessuna richiesta")

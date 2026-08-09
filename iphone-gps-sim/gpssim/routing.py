@@ -164,8 +164,13 @@ class Router:
         url = f"{self.endpoint}/trip/v1/{profile}/{coords}"
         params = {
             "roundtrip": "true",
+            # `destination` accetta solo "any" o "last" — "first" non è un
+            # valore valido e fa fallire il parser di OSRM con un secco 400
+            # "Query string malformed", prima ancora di guardare le tappe.
+            # Omesso: il default "any" ci va benissimo, non ci interessa quale
+            # tappa risulti nominalmente ultima quando si torna comunque
+            # all'origine.
             "source": "first",
-            "destination": "first",
             "overview": "full",
             "geometries": "geojson",
             "steps": "false",
@@ -190,15 +195,16 @@ class Router:
             # OSRM a volte spiega il rifiuto in un corpo JSON anche con uno
             # stato HTTP di errore; altre volte (limiti imposti a monte, non
             # da OSRM stesso) il corpo è testo semplice o una pagina. In
-            # entrambi i casi vale la pena mostrarlo: è la sola diagnosi che
-            # abbiamo per un servizio che non controlliamo.
+            # entrambi i casi vale la pena mostrarlo — e mostrare anche la
+            # richiesta esatta che abbiamo mandato: è la sola diagnosi che
+            # abbiamo per un servizio che non controlliamo, e senza la
+            # richiesta un "Query string malformed" non dice dove guardare.
             detail = _extract_error_detail(response)
             raise RouteError(
                 f"Il motore di routing ha risposto {response.status_code}.",
-                hint=f"Con {len(waypoints)} tappe, è probabile che il servizio pubblico di demo abbia "
-                "rifiutato la richiesta perché troppo pesante da calcolare. Riduci il numero di "
-                "tappe (campo «Tappe») o scegli un'area più piccola, poi riprova.",
-                detail=detail,
+                hint="Il servizio pubblico di OSRM ha rifiutato la richiesta. Riprova, oppure prova "
+                "un'area più piccola o meno tappe (campo «Tappe»).",
+                detail=f"{detail}\nrichiesta: {response.request.url}",
             )
 
         try:
