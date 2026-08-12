@@ -119,9 +119,17 @@ class RouteProgress:
     index: int
     distance_m: float
     remaining_m: float
+    #: Velocità istantanea corrente — oscilla attorno a `target_speed_kmh`
+    #: durante il playback (vedi `gpssim.speed`), non è un valore fisso.
     speed_kmh: float
+    #: Velocità scelta dall'utente: il centro attorno a cui `speed_kmh` varia.
+    target_speed_kmh: float = 0.0
     #: `False` mentre il giro è stato pianificato ma non ancora avviato.
     playing: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.target_speed_kmh:
+            self.target_speed_kmh = self.speed_kmh
 
     @property
     def progress_fraction(self) -> float:
@@ -131,7 +139,9 @@ class RouteProgress:
 
     @property
     def eta_seconds(self) -> float:
-        speed_m_s = (self.speed_kmh * 1000) / 3600
+        # La velocità target (non quella istantanea) dà una stima stabile:
+        # con l'istantanea l'ETA salterebbe ad ogni rallentamento e ripresa.
+        speed_m_s = (self.target_speed_kmh * 1000) / 3600
         return self.remaining_m / speed_m_s if speed_m_s > 0 else 0.0
 
     def to_dict(self) -> dict[str, Any]:
@@ -142,6 +152,7 @@ class RouteProgress:
             "distance_m": self.distance_m,
             "remaining_m": self.remaining_m,
             "speed_kmh": self.speed_kmh,
+            "target_speed_kmh": self.target_speed_kmh,
             "playing": self.playing,
             "progress_fraction": self.progress_fraction,
             "eta_seconds": self.eta_seconds,

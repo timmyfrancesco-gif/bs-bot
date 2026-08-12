@@ -75,6 +75,12 @@ pubblico lo calcolerebbe in tempo utile. Quello che l'app fa invece:
    dispositivo si sposta con passi regolari invece che a scatti sulle
    rettilinee.
 
+La velocità che scegli è quella di **crociera**, non un valore fisso per
+tutto il giro: `gpssim/speed.py` genera un profilo che rallenta e riprende
+gradualmente lungo il percorso (mai sotto il 45% del target, mai sopra),
+come nel traffico vero — invece di muoversi a un ritmo costante e
+riconoscibile dall'inizio alla fine.
+
 ## Requisiti
 
 - Python 3.10+
@@ -202,6 +208,7 @@ amministratore». Su iOS 16 e precedenti il tunnel non serve e `sudo` nemmeno.
 | `gpssim/location.py` | Backend di posizione + `LocationSession` (keep-alive, stato, recupero) |
 | `gpssim/geocode.py` | Nominatim con rate limit, cache e User-Agent identificativo |
 | `gpssim/routing.py` | Giro città: campionamento dell'area + routing OSRM + infittimento della geometria |
+| `gpssim/speed.py` | Profilo di velocità realistico (variazione attorno al target) per il playback del giro |
 | `gpssim/api.py` | API FastAPI locale + stream SSE dello stato |
 | `gpssim/server.py` | Avvio di uvicorn, in primo piano o in un thread di servizio |
 | `gpssim/desktop.py` | Wrapper `pywebview` |

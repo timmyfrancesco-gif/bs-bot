@@ -135,6 +135,36 @@ class RoutePlaybackTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(status.route)
         self.assertEqual(status.state, SessionState.IDLE)
 
+    async def test_il_giro_parte_alla_velocita_target(self) -> None:
+        """Prima ancora di muoversi, la velocità mostrata è quella scelta
+        dall'utente — il rallentamento arriva dopo, non da subito."""
+        status = await self.session.play_route(ROUTE, speed_kmh=70.0, label="Test", seed=1)
+        assert status.route is not None
+        self.assertEqual(status.route.speed_kmh, 70.0)
+        self.assertEqual(status.route.target_speed_kmh, 70.0)
+        await self.session.stop_route()
+
+    async def test_la_velocita_istantanea_varia_durante_il_giro(self) -> None:
+        """Il punto centrale della richiesta: non una velocità costante per
+        tutto il giro, ma un giro che rallenta e riprende gradualmente."""
+        long_route = [P0, P1, P2, Coordinate(45.4700, 9.2000), P0]
+        await self.session.play_route(long_route, speed_kmh=70.0, label="Test", seed=1)
+
+        seen: set[float] = set()
+        for _ in range(200):
+            route = self.session.status.route
+            if route is None:
+                break
+            seen.add(round(route.speed_kmh, 1))
+            if not route.playing:
+                break
+            await asyncio.sleep(0.005)
+
+        self.assertGreater(len(seen), 1, "la velocità istantanea non è mai cambiata")
+        for value in seen:
+            self.assertLessEqual(value, 70.0 + 1e-6)
+            self.assertGreater(value, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

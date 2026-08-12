@@ -74,6 +74,10 @@
         <label>km/h <input id="tour-speed" type="number" min="1" max="200" step="1" value="50"></label>
         <label>Tappe <input id="tour-waypoints" type="number" min="2" max="50" step="1" placeholder="auto"></label>
       </div>
+      <p class="hint">
+        È la velocità di crociera, non un valore fisso: durante il giro
+        rallenta e riprende gradualmente, come nel traffico vero.
+      </p>
       <button id="tour-plan" class="button button--block" disabled>Genera il giro</button>
       <p id="tour-stats" class="hint"></p>
       <div class="row">

@@ -455,8 +455,10 @@ function renderStatusItems(status) {
     el.routeInfo.hidden = false;
     const km = (status.route.remaining_m / 1000).toFixed(1);
     const eta = Math.max(0, Math.round(status.route.eta_seconds / 60));
+    const kmh = Math.round(status.route.speed_kmh);
     el.routeInfo.textContent = status.route.playing
-      ? `${status.route.label}: ${status.route.index + 1}/${status.route.points} · ${km} km rimanenti · ~${eta} min`
+      ? `${status.route.label}: ${status.route.index + 1}/${status.route.points} · ${km} km rimanenti · `
+        + `${kmh} km/h · ~${eta} min`
       : `${status.route.label}: fermato`;
   } else {
     el.routeInfo.hidden = true;

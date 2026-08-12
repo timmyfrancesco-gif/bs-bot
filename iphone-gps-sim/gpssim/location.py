@@ -37,6 +37,7 @@ from .device import DeviceConnection, DeviceManager, ProgressCallback, noop_prog
 from .errors import ErrorCode, GpsSimError, classify
 from .models import KEEPALIVE_INTERVAL, Coordinate, RouteProgress, SessionState, Status
 from .routing import haversine_m, total_distance_m
+from .speed import build_speed_profile
 
 logger = logging.getLogger(__name__)
 
@@ -396,11 +397,21 @@ class LocationSession:
     # ------------------------------------------------------------------ #
 
     async def play_route(
-        self, points: list[Coordinate], *, speed_kmh: float, label: str = "Giro"
+        self,
+        points: list[Coordinate],
+        *,
+        speed_kmh: float,
+        label: str = "Giro",
+        seed: int | None = None,
     ) -> Status:
-        """Avvia il playback di un giro: attraversa i punti in ordine, a
-        velocità costante, senza bloccare il resto della sessione — chi vuole
-        fermarlo o disconnettersi nel frattempo deve poterlo fare.
+        """Avvia il playback di un giro: attraversa i punti in ordine, a una
+        velocità che oscilla in modo realistico attorno a ``speed_kmh``
+        (rallentamenti e riprese graduali, mai un valore fisso — vedi
+        :mod:`gpssim.speed`), senza bloccare il resto della sessione — chi
+        vuole fermarlo o disconnettersi nel frattempo deve poterlo fare.
+
+        :param seed: fissa la sequenza di variazione della velocità; usato
+            solo nei test, normale lasciarlo a ``None``.
         """
         if len(points) < 2:
             raise GpsSimError(
@@ -421,10 +432,11 @@ class LocationSession:
                 distance_m=distance,
                 remaining_m=distance,
                 speed_kmh=speed_kmh,
+                target_speed_kmh=speed_kmh,
                 playing=True,
             )
             self._route_task = asyncio.create_task(
-                self._route_loop(points, speed_kmh, label), name="gps-route"
+                self._route_loop(points, speed_kmh, label, seed=seed), name="gps-route"
             )
             self._publish()
             return self.status
@@ -443,12 +455,30 @@ class LocationSession:
                 )
             return self.status
 
-    async def _route_loop(self, points: list[Coordinate], speed_kmh: float, label: str) -> None:
+    async def _route_loop(
+        self, points: list[Coordinate], speed_kmh: float, label: str, *, seed: int | None = None
+    ) -> None:
         total = total_distance_m(points)
         traveled = 0.0
-        speed_m_s = (speed_kmh * 1000) / 3600
+        profile = build_speed_profile(speed_kmh, total, seed=seed)
         try:
             for index, point in enumerate(points):
+                has_next = index + 1 < len(points)
+                if has_next:
+                    step = haversine_m(point, points[index + 1])
+                    # La velocità del segmento che stiamo per percorrere si
+                    # legge a metà strada, non all'inizio: è la stima più
+                    # rappresentativa del tratto — ed è anche quella mostrata
+                    # nello stato, così il numero visto in UI è sempre quello
+                    # davvero in uso per il passo in corso, non quello del
+                    # passo già concluso.
+                    midpoint_fraction = (traveled + step / 2) / total if total > 0 else 1.0
+                    current_kmh = profile.kmh_at(midpoint_fraction)
+                else:
+                    # Ultimo punto: il giro è già finito, non c'è altro
+                    # segmento da percorrere. Mostra la velocità di arrivo.
+                    current_kmh = profile.kmh_at(1.0)
+
                 async with self._lock:
                     if self.status.route is None:
                         return
@@ -456,17 +486,18 @@ class LocationSession:
                     remaining = max(0.0, total - traveled)
                     self.status.route.index = index
                     self.status.route.remaining_m = remaining
+                    self.status.route.speed_kmh = current_kmh
                 self._set_state(
                     SessionState.SIMULATING,
                     message=f"{label}: punto {index + 1}/{len(points)} · "
-                    f"{remaining / 1000:.1f} km rimanenti",
+                    f"{remaining / 1000:.1f} km rimanenti · {current_kmh:.0f} km/h",
                     real_location=False,
                 )
                 self._start_keepalive()
 
-                if index + 1 < len(points):
-                    step = haversine_m(point, points[index + 1])
+                if has_next:
                     traveled += step
+                    speed_m_s = (current_kmh * 1000) / 3600
                     await asyncio.sleep(step / speed_m_s)
         except asyncio.CancelledError:
             raise

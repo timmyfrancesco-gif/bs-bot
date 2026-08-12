@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iphone-gps-sim"
-version = "0.3.2"
+version = "0.4.0"
 description = "Simulatore di posizione GPS per iPhone via USB, alternativa open source a GhostMe"
 readme = "README.md"
 requires-python = ">=3.10"
